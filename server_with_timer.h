@@ -2,7 +2,7 @@
 #define SERVER_WITH_TIMER_H
 
 #include "get_local_addr_to_bind.h"
-#include <stdio.h>
+#include "Socket.h"
 #include <string.h>
 #include <time.h>
 #include <thread>
@@ -17,7 +17,7 @@ namespace ba_socket {
     }
 
     // Worker thread: handles a single client connection
-    void handle_client(SOCKET socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
+    void handle_client(Socket socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
         ++active_clients;
         printf("[Active clients: %d]\n", active_clients.load());
         
@@ -38,10 +38,9 @@ namespace ba_socket {
         fflush(stdout);
 
         char request[1024];
-        int bytes_received = recv(socket_client, request, sizeof(request), 0);
+        int bytes_received = static_cast<int>(socket_client.recv(request, sizeof(request)));
         if (bytes_received < 1) {
             fprintf(stderr, "recv() failed. (%d)\n", GET_SOCKET_ERRNO());
-            CLOSE_SOCKET(socket_client);
             --active_clients;
             return;
         }

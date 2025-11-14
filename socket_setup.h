@@ -49,7 +49,7 @@
     #define INVALID_SOCKET     (-1)
     #define SOCKET_ERROR       (-1)
     #define IS_VALID_SOCKET(s) ((s) >= 0)
-    #define CLOSE_SOCKET(s)    (close(s))
+    #define CLOSE_SOCKET(s)    (::close(s))
     #define GET_SOCKET_ERRNO() (errno)
 
     #define SOCKET_STARTUP()
