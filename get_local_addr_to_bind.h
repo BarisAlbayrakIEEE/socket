@@ -8,7 +8,7 @@ namespace ba_socket {
     struct addrinfo* get_local_addr_to_bind(void) {
         struct addrinfo hints;
         memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
+        hints.ai_family = AF_INET6;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_PASSIVE;
 

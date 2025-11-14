@@ -14,7 +14,7 @@ namespace ba_socket {
         printf("Configuring local address...\n");
         struct addrinfo *bind_address = get_local_addr_to_bind();
 
-        // create a socket to listen for connections
+        // create a socket with IPv6 stack to listen for connections
         printf("Creating listening socket...\n");
         SOCKET socket_listen;
         socket_listen = socket(
@@ -23,6 +23,14 @@ namespace ba_socket {
             bind_address->ai_protocol);
         if (!IS_VALID_SOCKET(socket_listen)) {
             fprintf(stderr, "socket() failed. (%d)\n", GET_SOCKET_ERRNO());
+            return 1;
+        }
+
+        // convert IPV6_V6ONLY socket to dual stack.
+        // disable IPV6_V6ONLY to accept both IPv4 and IPv6
+        int option = 0;
+        if (setsockopt(socket_listen, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&option, sizeof(option))) {
+            fprintf(stderr, "setsockopt() failed. (%d)\n", GET_SOCKET_ERRNO());
             return 1;
         }
 

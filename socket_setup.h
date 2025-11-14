@@ -55,5 +55,8 @@
     #define SOCKET_STARTUP()
     #define SOCKET_CLEANUP()
 #endif
+#if !defined(IPV6_V6ONLY)
+    #define IPV6_V6ONLY 27
+#endif
 
 #endif // SOCKET_SETUP_H
