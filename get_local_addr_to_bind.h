@@ -3,6 +3,7 @@
 
 #include "socket_setup.h"
 #include <cstring>
+#include <stdio.h>
 
 namespace ba_socket {
     struct addrinfo* get_local_addr_to_bind(void) {
@@ -13,7 +14,11 @@ namespace ba_socket {
         hints.ai_flags = AI_PASSIVE;
 
         struct addrinfo *bind_address;
-        getaddrinfo(0, "8080", &hints, &bind_address);
+        int status = getaddrinfo(NULL, "8080", &hints, &bind_address);
+        if(status) {
+            fprintf(stderr, "getaddrinfo() failed: %s\n", gai_strerror(status));
+            return nullptr;
+        }
         return bind_address;
     }
 } // namespace ba_socket

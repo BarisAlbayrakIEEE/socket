@@ -5,8 +5,79 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <thread>
+#include <atomic>
+#include <csignal>
 
 namespace ba_socket {
+    std::atomic<bool> running{true};
+    std::atomic<int> active_clients{0};
+    void signal_handler(int) {
+        running = false;
+    }
+
+    // Worker thread: handles a single client connection
+    void handle_client(SOCKET socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
+        ++active_clients;
+        printf("[Active clients: %d]\n", active_clients.load());
+        
+        // print client address
+        printf("Printing client address... ");
+
+        char address_buffer[100];
+        getnameinfo(
+            (struct sockaddr*)&client_address,
+            client_len,
+            address_buffer, sizeof(address_buffer),
+            NULL, 0,
+            NI_NUMERICHOST);
+        printf("[Client connected] %s\n", address_buffer);
+
+        // Read the request
+        printf("Reading the request...\n");
+        fflush(stdout);
+
+        char request[1024];
+        int bytes_received = recv(socket_client, request, sizeof(request), 0);
+        if (bytes_received < 1) {
+            fprintf(stderr, "recv() failed. (%d)\n", GET_SOCKET_ERRNO());
+            CLOSE_SOCKET(socket_client);
+            --active_clients;
+            return;
+        }
+        printf("[Request from %s]\n%.*s\n", address_buffer, bytes_received, request);
+        fflush(stdout);
+
+        // send the response
+        printf("Sending the response...\n");
+
+        time_t timer;
+        time(&timer);
+        char *time_msg = ctime(&timer);
+        time_msg[strcspn(time_msg, "\n")] = '\0';
+
+        char body[256];
+        snprintf(body, sizeof(body), "Local time is: %s", time_msg);
+        char header[256];
+        snprintf(header, sizeof(header),
+            "HTTP/1.1 200 OK\r\n"
+            "Connection: close\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: %zu\r\n\r\n",
+            strlen(body));
+
+        send(socket_client, header, strlen(header), 0);
+        send(socket_client, body, strlen(body), 0);
+        printf("[Response sent to %s]\n", address_buffer);
+
+        // close client socket (connection)
+        printf("Closing client socket (connection)...\n");
+        CLOSE_SOCKET(socket_client);
+        printf("[Client socket (connection) closed] %s\n", address_buffer);
+
+        --active_clients;
+    }
+
     int server_with_timer(void) {
         SOCKET_STARTUP();
 
@@ -28,20 +99,16 @@ namespace ba_socket {
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        int option = 0;
-        if (setsockopt(socket_listen, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&option, sizeof(option))) {
+        printf("Converting IPV6_V6ONLY socket to dual stack...\n");
+        int option = 1; // reuse address option
+        if (setsockopt(socket_listen, SOL_SOCKET, SO_REUSEADDR, (void*)&option, sizeof(option))) {
             fprintf(stderr, "setsockopt() failed. (%d)\n", GET_SOCKET_ERRNO());
             return 1;
         }
 
         // bind listening socket to local address
         printf("Binding listening socket to local address...\n");
-        if (
-            bind(
-                socket_listen,
-                bind_address->ai_addr,
-                bind_address->ai_addrlen))
-        {
+        if (bind(socket_listen, bind_address->ai_addr, bind_address->ai_addrlen)) {
             fprintf(stderr, "bind() failed. (%d)\n", GET_SOCKET_ERRNO());
             return 1;
         }
@@ -53,73 +120,42 @@ namespace ba_socket {
             fprintf(stderr, "listen() failed. (%d)\n", GET_SOCKET_ERRNO());
             return 1;
         }
+        printf("Server is listening... (Ctrl+C to stop)\n");
 
-        // accept a connection
-        printf("Accepting a connection...\n");
-        struct sockaddr_storage client_address;
-        socklen_t client_len = sizeof(client_address);
-        SOCKET socket_client = accept(
-            socket_listen,
-            (struct sockaddr*) &client_address,
-            &client_len);
-        if (!IS_VALID_SOCKET(socket_client)) {
-            fprintf(stderr, "accept() failed. (%d)\n", GET_SOCKET_ERRNO());
-            return 1;
+        // Accept loop
+        signal(SIGINT, signal_handler);
+        while (running) {
+            // accept a connection
+            printf("Accepting a connection...\n");
+            fflush(stdout);
+
+            struct sockaddr_storage client_address;
+            socklen_t client_len = sizeof(client_address);
+            SOCKET socket_client = accept(socket_listen, (struct sockaddr*)&client_address, &client_len);
+            if (!IS_VALID_SOCKET(socket_client)) {
+                fprintf(stderr, "accept() failed. (%d)\n", GET_SOCKET_ERRNO());
+                continue; // try again
+            }
+
+            // Spawn a detached thread per client
+            if (!running) {
+                CLOSE_SOCKET(socket_client);
+                break;
+            }
+            std::thread(handle_client, socket_client, client_address, client_len).detach();
         }
-
-        // print client address
-        printf("Printing client address... ");
-        char address_buffer[100];
-        getnameinfo(
-            (struct sockaddr*)&client_address,
-            client_len,
-            address_buffer,
-            sizeof(address_buffer),
-            NULL,
-            0,
-            NI_NUMERICHOST);
-        printf("%s\n", address_buffer);
-
-        // read a request
-        printf("Reading a request...\n");
-        char request[1024];
-        int bytes_received = recv(socket_client, request, 1024, 0);
-        if (bytes_received < 1) {
-            fprintf(stderr, "recv() failed. (%d)\n", GET_SOCKET_ERRNO());
-            return 1;
-        }
-        printf("%.*s", bytes_received, request);
-
-        // send a response
-        printf("Sending a response...\n");
-        const char *response =
-            "HTTP/1.1 200 OK\r\n"
-            "Connection: close\r\n"
-            "Content-Type: text/plain\r\n\r\n"
-            "Local time is: ";
-        int bytes_sent = send(socket_client, response, strlen(response), 0);
-        if (bytes_sent != (int)strlen(response)) {
-            fprintf(stderr, "send() failed. (%d)\n", GET_SOCKET_ERRNO());
-            return 1;
-        }
-
-        // send time
-        time_t timer;
-        time(&timer);
-        char *time_msg = ctime(&timer);
-        bytes_sent = send(socket_client, time_msg, strlen(time_msg), 0);
-        if (bytes_sent != (int)strlen(time_msg)) {
-            fprintf(stderr, "send() failed. (%d)\n", GET_SOCKET_ERRNO());
-            return 1;
-        }
-
-        // close client socket (connection)
-        printf("Closing client socket (connection)...\n");
-        CLOSE_SOCKET(socket_client);
 
         // close listening socket
+        printf("Waiting for clients to finish...\n");
+        while (active_clients.load() > 0) {
+            printf("[Active clients: %d]\n", active_clients.load());
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+        printf("All clients finished.\n");
+
         printf("Closing listening socket...\n");
         CLOSE_SOCKET(socket_listen);
+        printf("Closed listening socket...\n");
 
         SOCKET_CLEANUP();
         return 0;
