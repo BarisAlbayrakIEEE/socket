@@ -10,11 +10,41 @@
 namespace ba_socket {
     class Socket {
     public:
-        Socket(int domain, int type, int protocol = 0) {
+        Socket(int domain, int type, int protocol) {
             _fd = ::socket(domain, type, protocol);
             if (!IS_VALID_SOCKET(_fd)) {
                 SOCKET_ERROR__SOCKET();
             }
+        }
+        Socket(uint16_t port, int domain = AF_INET6, int type = AI_PASSIVE, int protocol = AI_PASSIVE) {
+            // get the local address to bind to
+            char port_str[8];
+            snprintf(port_str, sizeof(port_str), "%u", port);
+
+            struct addrinfo hints{};
+            hints.ai_family = domain;
+            hints.ai_socktype = type;
+            hints.ai_flags = protocol;
+            struct addrinfo* bind_address = nullptr;
+            int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_address);
+            if (status != 0) {
+                SOCKET_ERROR__GETADDRINFO();
+            }
+
+            // create the socket
+            _fd = ::socket(domain, type, protocol);
+            if (!IS_VALID_SOCKET(_fd)) {
+                SOCKET_ERROR__SOCKET();
+            }
+            
+            // bind the socket to the local address
+            if (::bind(_fd, bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
+                freeaddrinfo(bind_address);
+                SOCKET_ERROR__BIND();
+            }
+
+            // free the address info
+            freeaddrinfo(bind_address);
         }
         explicit Socket(SOCKET fd) noexcept : _fd(fd) {};
         ~Socket() { close(); };
@@ -34,6 +64,16 @@ namespace ba_socket {
             return *this;
         };
 
+        // factory to safely use the default values of the bound constructor
+        static Socket create_bind_socket(
+            uint16_t port,
+            int domain = AF_INET6,
+            int type = AI_PASSIVE,
+            int protocol = AI_PASSIVE) noexcept
+        {
+            return Socket(port, domain, type, protocol);
+        }
+
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
         inline bool socketopt(int option) {
@@ -47,7 +87,35 @@ namespace ba_socket {
         inline bool bind(const struct sockaddr* addr, socklen_t addrlen) {
             if (::bind(_fd, addr, addrlen)) {
                 SOCKET_ERROR__BIND();
+                return false;
             }
+            return true;
+        }
+
+        // Create the local bind address for any interface on given port
+        bool bind_any(uint16_t port, int family = AF_INET6) {
+            // get the local address to bind to
+            char port_str[8];
+            snprintf(port_str, sizeof(port_str), "%u", port);
+
+            struct addrinfo hints{};
+            hints.ai_family = family;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_flags = AI_PASSIVE;
+            struct addrinfo* bind_address = nullptr;
+            int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_address);
+            if (status != 0) {
+                SOCKET_ERROR__GETADDRINFO();
+            }
+
+            // bind the socket to the local address
+            if (::bind(_fd, bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
+                freeaddrinfo(bind_address);
+                SOCKET_ERROR__BIND();
+            }
+
+            // free the address info
+            freeaddrinfo(bind_address);
             return true;
         }
 
@@ -98,6 +166,7 @@ namespace ba_socket {
         }
 
         // Receive data
+        // inspect the return value for number of bytes received
         inline ssize_t recv(void* buffer, size_t length, int flags = 0) {
             ssize_t bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
             if (bytes_received < 1) {

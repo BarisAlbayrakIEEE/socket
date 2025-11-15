@@ -66,9 +66,10 @@
     #define SOCKET_ERROR__SETSOCKOPT() \
         fprintf(stderr, "[setsockopt() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO()); \
         return false
+    #define SOCKET_ERROR__GETADDRINFO() \
+        fprintf(stderr, "[getaddrinfo() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__BIND() \
-        fprintf(stderr, "[bind() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());       \
-        return false
+        fprintf(stderr, "[bind() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__LISTEN() \
         fprintf(stderr, "[listen() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());     \
         return false
@@ -88,6 +89,8 @@
         throw std::runtime_error(std::string("[socket() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__SETSOCKOPT() \
         throw std::runtime_error(std::string("[setsockopt() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
+    #define SOCKET_ERROR__GETADDRINFO() \
+        throw std::runtime_error(std::string("[getaddrinfo() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__BIND() \
         throw std::runtime_error(std::string("[bind() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__LISTEN() \
