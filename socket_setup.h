@@ -62,27 +62,27 @@
 #define BA_SOCKET_DEBUG
 #ifdef BA_SOCKET_DEBUG
     #define SOCKET_ERROR__SOCKET() \
-        fprintf(stderr, "[socket() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+        fprintf(stderr, "[socket() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__SETSOCKOPT() \
-        fprintf(stderr, "[setsockopt() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO()); \
+        fprintf(stderr, "[setsockopt() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO()); \
         return false
     #define SOCKET_ERROR__GETADDRINFO() \
-        fprintf(stderr, "[getaddrinfo() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+        fprintf(stderr, "[getaddrinfo() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__BIND() \
-        fprintf(stderr, "[bind() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+        fprintf(stderr, "[bind() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__LISTEN() \
-        fprintf(stderr, "[listen() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());     \
+        fprintf(stderr, "[listen() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());     \
         return false
     #define SOCKET_ERROR__ACCEPT() \
-        fprintf(stderr, "[accept() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+        fprintf(stderr, "[accept() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__RECV() \
-        fprintf(stderr, "[recv() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());       \
+        fprintf(stderr, "[recv() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());       \
         return false
     #define SOCKET_ERROR__SEND() \
-        fprintf(stderr, "[send() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());       \
+        fprintf(stderr, "[send() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());       \
         return false
     #define SOCKET_ERROR__CONNECT() \
-        fprintf(stderr, "[connect() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());    \
+        fprintf(stderr, "[connect() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());    \
         return false
 #else
     #define SOCKET_ERROR__SOCKET() \

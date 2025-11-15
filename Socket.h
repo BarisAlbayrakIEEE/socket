@@ -16,7 +16,7 @@ namespace ba_socket {
                 SOCKET_ERROR__SOCKET();
             }
         }
-        Socket(uint16_t port, int domain = AF_INET6, int type = AI_PASSIVE, int protocol = AI_PASSIVE) {
+        Socket(uint16_t port, int domain = AF_INET6, int type = SOCK_STREAM, int flags = AI_PASSIVE) {
             // get the local address to bind to
             char port_str[8];
             snprintf(port_str, sizeof(port_str), "%u", port);
@@ -24,7 +24,7 @@ namespace ba_socket {
             struct addrinfo hints{};
             hints.ai_family = domain;
             hints.ai_socktype = type;
-            hints.ai_flags = protocol;
+            hints.ai_flags = flags;
             struct addrinfo* bind_address = nullptr;
             int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_address);
             if (status != 0) {
@@ -32,7 +32,7 @@ namespace ba_socket {
             }
 
             // create the socket
-            _fd = ::socket(domain, type, protocol);
+            _fd = ::socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
             if (!IS_VALID_SOCKET(_fd)) {
                 SOCKET_ERROR__SOCKET();
             }
@@ -68,10 +68,10 @@ namespace ba_socket {
         static Socket create_bind_socket(
             uint16_t port,
             int domain = AF_INET6,
-            int type = AI_PASSIVE,
-            int protocol = AI_PASSIVE) noexcept
+            int type = SOCK_STREAM,
+            int flags = AI_PASSIVE) noexcept
         {
-            return Socket(port, domain, type, protocol);
+            return Socket(port, domain, type, flags);
         }
 
         // convert IPV6_V6ONLY socket to dual stack.

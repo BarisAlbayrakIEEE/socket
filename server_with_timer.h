@@ -1,7 +1,6 @@
 #ifndef SERVER_WITH_TIMER_H
 #define SERVER_WITH_TIMER_H
 
-#include "get_local_addr_to_bind.h"
 #include "Socket.h"
 #include <string.h>
 #include <time.h>
@@ -17,7 +16,7 @@ namespace ba_socket {
     }
 
     // Worker thread: handles a single client connection
-    void handle_client(Socket socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
+    void handle_client(Socket&& socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
         ++active_clients;
         printf("[Active clients: %d]\n", active_clients.load());
         
@@ -107,7 +106,7 @@ namespace ba_socket {
                 socket_client.close();
                 break;
             }
-            std::thread(handle_client, socket_client, client_address, client_len).detach();
+            std::thread(handle_client, std::move(socket_client), client_address, client_len).detach();
         }
 
         // close listening socket
