@@ -8,43 +8,6 @@
 #include <stdio.h>
 
 namespace ba_socket {
-#define BA_SOCKET_DEBUG
-#ifdef BA_SOCKET_DEBUG
-    #define SOCKET_ERROR__RECV() \
-        fprintf(stderr, "[recv() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__SOCKET() \
-        fprintf(stderr, "[socket() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__SETSOCKOPT() \
-        fprintf(stderr, "[setsockopt() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__BIND() \
-        fprintf(stderr, "[bind() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__LISTEN() \
-        fprintf(stderr, "[listen() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__ACCEPT() \
-        fprintf(stderr, "[accept() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__SEND() \
-        fprintf(stderr, "[send() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__CONNECT() \
-        fprintf(stderr, "[connect() error] %s: %s (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-#else
-    #define SOCKET_ERROR__RECV() \
-        throw std::runtime_error(std::string("[recv() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__SOCKET() \
-        throw std::runtime_error(std::string("[socket() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__SETSOCKOPT() \
-        throw std::runtime_error(std::string("[setsockopt() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__BIND() \
-        throw std::runtime_error(std::string("[bind() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__LISTEN() \
-        throw std::runtime_error(std::string("[listen() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__ACCEPT() \
-        throw std::runtime_error(std::string("[accept() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__SEND() \
-        throw std::runtime_error(std::string("[send() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__CONNECT() \
-        throw std::runtime_error(std::string("[connect() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-#endif
-
     class Socket {
     public:
         Socket(int domain, int type, int protocol = 0) {
@@ -73,31 +36,36 @@ namespace ba_socket {
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        inline void socketopt(int option) {
+        inline bool socketopt(int option) {
             if (setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, (void*)&option, sizeof(option))) {
                 SOCKET_ERROR__SETSOCKOPT();
             }
+            return true;
         }
 
         // Bind to local address
-        inline void bind(const struct sockaddr* addr, socklen_t addrlen) {
+        inline bool bind(const struct sockaddr* addr, socklen_t addrlen) {
             if (::bind(_fd, addr, addrlen)) {
                 SOCKET_ERROR__BIND();
             }
+            return true;
         }
 
         // Listen for connections
-        inline void listen(int backlog = 10) {
+        inline bool listen(int backlog = 10) {
             if (::listen(_fd, backlog) < 0) {
                 SOCKET_ERROR__LISTEN();
             }
+            return true;
         }
 
         // Accept a new connection (returns a new RAII socket)
+        // inspect the returned Socket with is_valid() before use
         inline Socket accept(struct sockaddr* addr = nullptr, socklen_t* addrlen = nullptr) {
             SOCKET client_fd = ::accept(_fd, addr, addrlen);
             if (!IS_VALID_SOCKET(client_fd)) {
                 SOCKET_ERROR__ACCEPT();
+                client_fd = -1;
             }
             return Socket(client_fd);
         }
@@ -139,10 +107,11 @@ namespace ba_socket {
         }
 
         // Connect to remote address
-        inline void connect(const struct sockaddr* addr, socklen_t addrlen) {
+        inline bool connect(const struct sockaddr* addr, socklen_t addrlen) {
             if (::connect(_fd, addr, addrlen) < 0) {
                 SOCKET_ERROR__CONNECT();
             }
+            return true;
         }
 
         // Close the socket (safe to call multiple times)

@@ -65,14 +65,12 @@ namespace ba_socket {
             "Content-Length: %zu\r\n\r\n",
             strlen(body));
 
-        send(socket_client, header, strlen(header), 0);
-        send(socket_client, body, strlen(body), 0);
-        printf("[Response sent to %s]\n", address_buffer);
+        socket_client.send(header, strlen(header), 0);
+        socket_client.send(body, strlen(body), 0);
 
         // close client socket (connection)
         printf("Closing client socket (connection)...\n");
-        CLOSE_SOCKET(socket_client);
-        printf("[Client socket (connection) closed] %s\n", address_buffer);
+        socket_client.close();
 
         --active_clients;
     }
@@ -86,40 +84,35 @@ namespace ba_socket {
 
         // create a socket with IPv6 stack to listen for connections
         printf("Creating listening socket...\n");
-        SOCKET socket_listen;
-        socket_listen = socket(
+        SOCKET fd_listen = socket(
             bind_address->ai_family,
             bind_address->ai_socktype,
             bind_address->ai_protocol);
-        if (!IS_VALID_SOCKET(socket_listen)) {
+        if (!IS_VALID_SOCKET(fd_listen)) {
             fprintf(stderr, "socket() failed. (%d)\n", GET_SOCKET_ERRNO());
             return 1;
         }
+        Socket socket_listen{ fd_listen };
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
         printf("Converting IPV6_V6ONLY socket to dual stack...\n");
-        int option = 1; // reuse address option
-        if (setsockopt(socket_listen, SOL_SOCKET, SO_REUSEADDR, (void*)&option, sizeof(option))) {
-            fprintf(stderr, "setsockopt() failed. (%d)\n", GET_SOCKET_ERRNO());
+        if (!socket_listen.socketopt(1)) {
             return 1;
         }
 
         // bind listening socket to local address
         printf("Binding listening socket to local address...\n");
-        if (bind(socket_listen, bind_address->ai_addr, bind_address->ai_addrlen)) {
-            fprintf(stderr, "bind() failed. (%d)\n", GET_SOCKET_ERRNO());
+        if (!socket_listen.bind(bind_address->ai_addr, bind_address->ai_addrlen)) {
             return 1;
         }
         freeaddrinfo(bind_address);
 
         // listen for connections
-        printf("Listening for connections...\n");
-        if (listen(socket_listen, 10) < 0) {
-            fprintf(stderr, "listen() failed. (%d)\n", GET_SOCKET_ERRNO());
+        printf("Listening for connections...(Ctrl+C to stop)\n");
+        if (!socket_listen.listen(10)) {
             return 1;
         }
-        printf("Server is listening... (Ctrl+C to stop)\n");
 
         // Accept loop
         signal(SIGINT, signal_handler);
@@ -130,15 +123,14 @@ namespace ba_socket {
 
             struct sockaddr_storage client_address;
             socklen_t client_len = sizeof(client_address);
-            SOCKET socket_client = accept(socket_listen, (struct sockaddr*)&client_address, &client_len);
-            if (!IS_VALID_SOCKET(socket_client)) {
-                fprintf(stderr, "accept() failed. (%d)\n", GET_SOCKET_ERRNO());
-                continue; // try again
+            Socket socket_client = socket_listen.accept((struct sockaddr*)&client_address, &client_len);
+            if (!socket_client.is_valid()) {
+                return 1;
             }
 
             // Spawn a detached thread per client
             if (!running) {
-                CLOSE_SOCKET(socket_client);
+                socket_client.close();
                 break;
             }
             std::thread(handle_client, socket_client, client_address, client_len).detach();
@@ -153,8 +145,7 @@ namespace ba_socket {
         printf("All clients finished.\n");
 
         printf("Closing listening socket...\n");
-        CLOSE_SOCKET(socket_listen);
-        printf("Closed listening socket...\n");
+        socket_listen.close();
 
         SOCKET_CLEANUP();
         return 0;
