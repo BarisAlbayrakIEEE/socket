@@ -35,12 +35,6 @@ namespace ba_socket {
         int family = AF_INET6,
         int socktype = SOCK_STREAM)
     {
-        struct addrinfo hints{};
-        std::memset(&hints, 0, sizeof(hints));
-        hints.ai_family   = family;
-        hints.ai_socktype = socktype;
-        hints.ai_flags    = AI_PASSIVE;
-
         std::string node;
         if (bind_mode == "all" || bind_mode == "any") {
             node.clear(); // == nullptr
@@ -54,8 +48,14 @@ namespace ba_socket {
             if (node.empty()) return nullptr;
         }
 
-        struct addrinfo* bind_address = nullptr;
+        struct addrinfo hints{};
+        std::memset(&hints, 0, sizeof(hints));
+        hints.ai_family   = family;
+        hints.ai_socktype = socktype;
+        hints.ai_flags    = AI_PASSIVE;
+
         std::string port_str(std::to_string(port));
+        struct addrinfo* bind_address = nullptr;
         int status = getaddrinfo(
             node.empty() ? nullptr : node.c_str(),
             port_str.c_str(),

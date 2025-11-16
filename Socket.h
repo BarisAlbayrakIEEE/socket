@@ -31,18 +31,21 @@ namespace ba_socket {
                 socktype);
             if (!bind_address) {
                 SOCKET_ERROR__GETADDRINFO();
+                return;
             }
 
             // create the socket
             _fd = ::socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
             if (!IS_VALID_SOCKET(_fd)) {
                 SOCKET_ERROR__SOCKET();
+                return;
             }
             
             // bind the socket to the local address
             if (::bind(_fd, bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
                 freeaddrinfo(bind_address);
                 SOCKET_ERROR__BIND();
+                return;
             }
 
             // free the address info
@@ -99,12 +102,14 @@ namespace ba_socket {
             int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_address);
             if (status != 0) {
                 SOCKET_ERROR__GETADDRINFO();
+                return false;
             }
 
             // bind the socket to the local address
             if (::bind(_fd, bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
                 freeaddrinfo(bind_address);
                 SOCKET_ERROR__BIND();
+                return false;
             }
 
             // free the address info
@@ -153,6 +158,7 @@ namespace ba_socket {
                         continue; // TODO: can wait with poll/select if needed
                     }
                     SOCKET_ERROR__SEND();
+                    return;
                 }
                 if (sent == 0) break; // shouldn't happen unless socket closed
                 total_sent += sent;

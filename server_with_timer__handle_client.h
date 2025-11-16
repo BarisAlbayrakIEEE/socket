@@ -13,6 +13,7 @@ namespace ba_socket {
         ++active_clients;
         printf("[Active clients: %d]\n", active_clients.load());
         
+#if defined(BA_SOCKET_DEBUG)
         // print client address
         printf("Printing client address... ");
 
@@ -28,6 +29,7 @@ namespace ba_socket {
         // Read the request
         printf("Reading the request...\n");
         fflush(stdout);
+#endif
 
         char request[1024];
         int bytes_received = static_cast<int>(socket_client.recv(request, sizeof(request)));
