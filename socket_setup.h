@@ -1,6 +1,8 @@
 #ifndef SOCKET_SETUP_H
 #define SOCKET_SETUP_H
 
+#include <stdexcept>
+
 #if defined(_WIN32)
     #ifndef _WIN32_WINNT
         #if defined(WINVER) && (WINVER >= 0x0A00)
@@ -61,8 +63,15 @@
 
 #define BA_SOCKET_DEBUG
 #ifdef BA_SOCKET_DEBUG
-    #define SOCKET_ERROR__GETIFADDRS() \
-        fprintf(stderr, "[getifaddrs() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+    #define SOCKET_ERROR__ALLOC() \
+        fprintf(stderr, "[malloc() error]\n")
+    #if defined(_WIN32)
+        #define SOCKET_ERROR__GETADAPTERSADDRESSES() \
+            fprintf(stderr, "[GetAdaptersAddresses() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+    #else
+        #define SOCKET_ERROR__GETIFADDRS() \
+            fprintf(stderr, "[getifaddrs() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+    #endif
     #define SOCKET_ERROR__GETADDRINFO() \
         fprintf(stderr, "[getaddrinfo() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__SOCKET() \
@@ -82,8 +91,15 @@
     #define SOCKET_ERROR__CONNECT() \
         fprintf(stderr, "[connect() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #else
-    #define SOCKET_ERROR__GETIFADDRS() \
-        throw std::runtime_error(std::string("[getifaddrs() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
+    #define SOCKET_ERROR__ALLOC() \
+        throw std::runtime_error(std::string("[malloc() error] "))
+    #if defined(_WIN32)
+        #define SOCKET_ERROR__GETADAPTERSADDRESSES() \
+            throw std::runtime_error(std::string("[GetAdaptersAddresses() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
+    #else
+        #define SOCKET_ERROR__GETIFADDRS() \
+            throw std::runtime_error(std::string("[getifaddrs() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
+    #endif
     #define SOCKET_ERROR__GETADDRINFO() \
         throw std::runtime_error(std::string("[getaddrinfo() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__SOCKET() \

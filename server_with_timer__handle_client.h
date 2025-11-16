@@ -1,5 +1,5 @@
-#ifndef HANDLE_CLIENT_H
-#define HANDLE_CLIENT_H
+#ifndef SERVER_WITH_TIMER__HANDLE_CLIENT_H
+#define SERVER_WITH_TIMER__HANDLE_CLIENT_H
 
 #include "Socket.h"
 #include <atomic>
@@ -67,4 +67,4 @@ namespace ba_socket {
     }
 } // namespace ba_socket
 
-#endif // HANDLE_CLIENT_H
+#endif // SERVER_WITH_TIMER__HANDLE_CLIENT_H

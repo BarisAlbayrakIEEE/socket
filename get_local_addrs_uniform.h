@@ -1,5 +1,5 @@
-#ifndef GET_UNIFORM_ADDRS_H
-#define GET_UNIFORM_ADDRS_H
+#ifndef GET_LOCAL_ADDRS_UNIFORM_H
+#define GET_LOCAL_ADDRS_UNIFORM_H
 
 #include "socket_setup.h"
 #ifdef _WIN32
@@ -22,13 +22,13 @@ namespace ba_socket {
 
     #ifdef _WIN32
         // get uniform address - windows
-        size_t get_uniform_addrs(Uniform_Addr *uniform_addrs, size_t max) {
+        size_t get_local_addrs_uniform(Uniform_Addr *uniform_addrs, size_t max) {
             DWORD asize = 15000;
             PIP_ADAPTER_ADDRESSES adapter_addrs = NULL;
             while (1) {
                 adapter_addrs = (PIP_ADAPTER_ADDRESSES)malloc(asize);
                 if (!adapter_addrs) {
-                    fprintf(stderr, "Allocation failure.\n");
+                    SOCKET_ERROR__ALLOC();
                     return 0;
                 }
 
@@ -43,7 +43,7 @@ namespace ba_socket {
                     adapter_addrs = NULL;
                     continue;
                 } else if (result != ERROR_SUCCESS) {
-                    fprintf(stderr, "GetAdaptersAddresses failed: %lu\n", result);
+                    SOCKET_ERROR__GETADAPTERSADDRESSES();
                     free(adapter_addrs);
                     return 0;
                 }
@@ -63,7 +63,6 @@ namespace ba_socket {
                 {
                     Uniform_Addr *uniform_addr = &uniform_addrs[count++];
                     memset(uniform_addr, 0, sizeof(*uniform_addr));
-
                     wcstombs(
                         uniform_addr->name,
                         it->FriendlyName,
@@ -78,10 +77,10 @@ namespace ba_socket {
         }
     #else
         // get uniform address - linux/unix
-        size_t get_uniform_addrs(Uniform_Addr *uniform_addrs, size_t max) {
+        size_t get_local_addrs_uniform(Uniform_Addr *uniform_addrs, size_t max) {
             struct ifaddrs *ifaddrs_;
             if (getifaddrs(&ifaddrs_) == -1) {
-                perror("getifaddrs");
+                SOCKET_ERROR__GETIFADDRS();
                 return 0;
             }
 
@@ -97,7 +96,6 @@ namespace ba_socket {
 
                 Uniform_Addr *uniform_addr = &uniform_addrs[count++];
                 memset(uniform_addr, 0, sizeof(*uniform_addr));
-
                 strncpy(uniform_addr->name, it->ifa_name, sizeof(uniform_addr->name));
                 uniform_addr->flags = it->ifa_flags;
                 uniform_addr->sock_addr = it->ifa_addr;
@@ -112,4 +110,4 @@ namespace ba_socket {
     #endif
 } // namespace ba_socket
 
-#endif // GET_UNIFORM_ADDRS_H
+#endif // GET_LOCAL_ADDRS_UNIFORM_H
