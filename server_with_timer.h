@@ -17,7 +17,7 @@ namespace ba_socket {
     }
 
     // Worker thread: handles a single client connection
-    void handle_client(Socket&& client_socket, struct sockaddr_storage client_address, socklen_t client_len) {
+    void handle_client(Socket&& socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
         ++active_clients;
         printf("[Active clients: %d]\n", active_clients.load());
         
@@ -38,7 +38,7 @@ namespace ba_socket {
         fflush(stdout);
 
         char request[1024];
-        int bytes_received = static_cast<int>(client_socket.recv(request, sizeof(request)));
+        int bytes_received = static_cast<int>(socket_client.recv(request, sizeof(request)));
         if (bytes_received < 1) {
             --active_clients;
             return;
@@ -64,12 +64,12 @@ namespace ba_socket {
             "Content-Length: %zu\r\n\r\n",
             strlen(body));
 
-        client_socket.send(header, strlen(header), 0);
-        client_socket.send(body, strlen(body), 0);
+        socket_client.send(header, strlen(header), 0);
+        socket_client.send(body, strlen(body), 0);
 
         // close client socket (connection)
         printf("Closing client socket (connection)...\n");
-        client_socket.close();
+        socket_client.close();
 
         --active_clients;
     }
@@ -79,17 +79,17 @@ namespace ba_socket {
 
         // create the server socket and bind to the local address
         printf("Creating socket for the server and binding it to the local address...\n");
-        Socket server_socket{ Socket::create_bind_socket() };
-        if (!server_socket.is_valid()) return 1;
+        Socket socket_listen{ Socket::create_bind_socket() };
+        if (!socket_listen.is_valid()) return 1;
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
         printf("Converting IPV6_V6ONLY socket to dual stack...\n");
-        if (!server_socket.socketopt(1)) return 1;
+        if (!socket_listen.socketopt(1)) return 1;
 
         // listen for connections
         printf("Listening for connections...(Ctrl+C to stop)\n");
-        if (!server_socket.listen(10)) return 1;
+        if (!socket_listen.listen(10)) return 1;
 
         // Accept loop
         {
@@ -102,17 +102,17 @@ namespace ba_socket {
 
                 struct sockaddr_storage client_address;
                 socklen_t client_len = sizeof(client_address);
-                Socket client_socket = server_socket.accept((struct sockaddr*)&client_address, &client_len);
-                if (!client_socket.is_valid()) return 1;
+                Socket socket_client = socket_listen.accept((struct sockaddr*)&client_address, &client_len);
+                if (!socket_client.is_valid()) return 1;
 
                 // Spawn a thread per client
                 if (!running) {
-                    client_socket.close();
+                    socket_client.close();
                     break;
                 }
                 client_threads.emplace_back(
                     handle_client,
-                    std::move(client_socket),
+                    std::move(socket_client),
                     client_address,
                     client_len);
             }
@@ -128,7 +128,7 @@ namespace ba_socket {
 
         // close listening socket
         printf("Closing listening socket...\n");
-        server_socket.close();
+        socket_listen.close();
 
         SOCKET_CLEANUP();
         return 0;
