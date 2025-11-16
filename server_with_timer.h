@@ -105,7 +105,7 @@ namespace ba_socket {
                 Socket client_socket = server_socket.accept((struct sockaddr*)&client_address, &client_len);
                 if (!client_socket.is_valid()) return 1;
 
-                // Spawn a detached thread per client
+                // Spawn a thread per client
                 if (!running) {
                     client_socket.close();
                     break;
