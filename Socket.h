@@ -64,9 +64,9 @@ namespace ba_socket {
             return *this;
         };
 
-        // factory to safely use the default values of the bound constructor
+        // factory to use the default values of the bound constructor safely with temporary objects
         static Socket create_bind_socket(
-            uint16_t port,
+            uint16_t port = 8080,
             int domain = AF_INET6,
             int type = SOCK_STREAM,
             int flags = AI_PASSIVE) noexcept
