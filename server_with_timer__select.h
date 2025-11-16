@@ -1,5 +1,5 @@
-#ifndef SERVER_WITH_TIMER__JTHREAD_H
-#define SERVER_WITH_TIMER__JTHREAD_H
+#ifndef SERVER_WITH_TIMER__SELECT_H
+#define SERVER_WITH_TIMER__SELECT_H
 
 #include "handle_client.h"
 #include <thread>
@@ -12,7 +12,7 @@ namespace ba_socket {
         running = false;
     }
 
-    int server_with_timer__jthread(void) {
+    int server_with_timer__select(void) {
         SOCKET_STARTUP();
 
         // create the server socket and bind to the local address
@@ -73,4 +73,4 @@ namespace ba_socket {
     }
 } // namespace ba_socket
 
-#endif // SERVER_WITH_TIMER__JTHREAD_H
+#endif // SERVER_WITH_TIMER__SELECT_H
