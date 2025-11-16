@@ -54,19 +54,12 @@ namespace ba_socket {
         hints.ai_socktype = socktype;
         hints.ai_flags    = AI_PASSIVE;
 
-        std::string port_str(std::to_string(port));
-        struct addrinfo* bind_address = nullptr;
-        int status = getaddrinfo(
+        // obtain the peer address
+        struct addrinfo *bind_addr = get_addrinfo(
+            socktype,
             node.empty() ? nullptr : node.c_str(),
-            port_str.c_str(),
-            &hints,
-            &bind_address);
-        if (status != 0) {
-            SOCKET_ERROR__GETADDRINFO();
-            return nullptr;
-        }
-
-        return bind_address;
+            port);
+        return bind_addr;
     }
 } // namespace ba_socket
 

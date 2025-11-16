@@ -2,6 +2,7 @@
 #define TCP_CLIENT_H
 
 #include "Socket.h"
+#include "utility_addr.h"
 #ifdef _WIN32
     #include <conio.h>
 #endif
@@ -11,31 +12,12 @@ namespace ba_socket {
         SOCKET_STARTUP();
 
         // obtain the peer address
-        PRINTF1("Obtaining the peer address...\n");
-        std::string port_str(std::to_string(port));
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_socktype = SOCK_STREAM;
-        struct addrinfo *peer_addr;
-        if (getaddrinfo(hostname.c_str(), port_str.c_str(), &hints, &peer_addr)) {
-            SOCKET_ERROR__GETADDRINFO();
-            return 1;
-        }
+        struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port);
+        if (!peer_addr) return 1;
 
-#if defined(BA_SOCKET_DEBUG)
         // print the peer address
-        PRINTF1("Printing the peer address...\n");
-        char buffer_addr[100];
-        char buffer_service[100];
-        getnameinfo(
-            peer_addr->ai_addr,
-            peer_addr->ai_addrlen,
-            buffer_addr,
-            sizeof(buffer_addr),
-            buffer_service,
-            sizeof(buffer_service),
-            NI_NUMERICHOST);
-        PRINTF3("%s %s\n", buffer_addr, buffer_service);
+#if defined(BA_SOCKET_DEBUG)
+        print_addrinfo(peer_addr);
 #endif
 
         // create the peer socket
@@ -46,6 +28,7 @@ namespace ba_socket {
             peer_addr->ai_protocol};
         if (!socket_peer.is_valid()) {
             SOCKET_ERROR__SOCKET();
+            freeaddrinfo(peer_addr);
             return 1;
         }
         SOCKET fd_peer = socket_peer.native_handle();

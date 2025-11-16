@@ -2,6 +2,7 @@
 #define SERVER_WITH_TIMER__HANDLE_CLIENT_H
 
 #include "Socket.h"
+#include "utility_addr.h"
 #include <atomic>
 #include <time.h>
 
@@ -9,27 +10,18 @@ namespace ba_socket {
 
     // Worker thread: handles a single client connection
     std::atomic<int> active_clients{0};
-    void handle_client(Socket&& socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
+    void handle_client(Socket&& socket_client, struct sockaddr_storage client_addr, socklen_t client_len) {
         ++active_clients;
         PRINTF2("[Active clients: %d]\n", active_clients.load());
-        
-#if defined(BA_SOCKET_DEBUG)
-        // print client address
-        PRINTF1("Printing client address... ");
 
-        char address_buffer[100];
-        ::getnameinfo(
-            (struct sockaddr*)&client_address,
-            client_len,
-            address_buffer, sizeof(address_buffer),
-            NULL, 0,
-            NI_NUMERICHOST);
-        PRINTF2("[Client connected] %s\n", address_buffer);
+        // print the client address
+#if defined(BA_SOCKET_DEBUG)
+        print_sockaddr(client_addr, client_len);
+#endif
 
         // Read the request
         PRINTF1("Reading the request...\n");
         fflush(stdout);
-#endif
 
         char request[1024];
         int bytes_received = static_cast<int>(socket_client.recv(request, sizeof(request)));
@@ -37,7 +29,6 @@ namespace ba_socket {
             --active_clients;
             return;
         }
-        PRINTF4("[Request from %s]\n%.*s\n", address_buffer, bytes_received, request);
         fflush(stdout);
 
         // send the response
