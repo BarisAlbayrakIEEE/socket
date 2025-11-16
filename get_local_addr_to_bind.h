@@ -25,6 +25,8 @@ namespace ba_socket {
                 }
             }
         }
+        SOCKET_ERROR__GETIFADDRS();
+        return std::string();
     }
 
     inline struct addrinfo* get_local_addr_to_bind(
@@ -49,6 +51,7 @@ namespace ba_socket {
         }
         else {
             node = get_ip_of_interface(bind_mode); // e.g. "eth0"
+            if (node.empty()) return nullptr;
         }
 
         struct addrinfo* bind_address = nullptr;

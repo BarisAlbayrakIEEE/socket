@@ -6,16 +6,16 @@ int main(int argc, char *argv[]) {
 }
 */
 
-/*
+//*
 #include "server_with_timer__jthread.h"
 using namespace ba_socket;
 int main(int argc, char *argv[]) {
     return server_with_timer__jthread();
 }
-*/
+//*/
 
+/*
 #include "TCP_client.h"
-
 using namespace ba_socket;
 
 int main(int argc, char *argv[]) {
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_STREAM;
     struct addrinfo *peer_address;
     if (getaddrinfo(argv[1], argv[2], &hints, &peer_address)) {
-        fprintf(stderr, "getaddrinfo() failed. (%d)\n", GET_SOCKET_ERRNO());
         return 1;
     }
 }
+*/
