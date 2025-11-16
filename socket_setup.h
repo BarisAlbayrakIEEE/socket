@@ -63,6 +63,15 @@
 
 #define BA_SOCKET_DEBUG
 #ifdef BA_SOCKET_DEBUG
+    #define PRINTF8(a, b, c, d, e, f, g, h) printf(a, b, c, d, e, f, g, h)
+    #define PRINTF7(a, b, c, d, e, f, g) printf(a, b, c, d, e, f, g)
+    #define PRINTF6(a, b, c, d, e, f) printf(a, b, c, d, e, f)
+    #define PRINTF5(a, b, c, d, e) printf(a, b, c, d, e)
+    #define PRINTF4(a, b, c, d) printf(a, b, c, d)
+    #define PRINTF3(a, b, c) printf(a, b, c)
+    #define PRINTF2(a, b) printf(a, b)
+    #define PRINTF1(a) printf(a)
+
     #define SOCKET_ERROR__ALLOC() \
         fprintf(stderr, "[malloc() error]\n")
     #if defined(_WIN32)
@@ -90,7 +99,18 @@
         fprintf(stderr, "[send() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__CONNECT() \
         fprintf(stderr, "[connect() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+    #define SOCKET_ERROR__SELECT() \
+        fprintf(stderr, "[select() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #else
+    #define PRINTF8(a, b, c, d, e, f, g, h)
+    #define PRINTF7(a, b, c, d, e, f, g)
+    #define PRINTF6(a, b, c, d, e, f)
+    #define PRINTF5(a, b, c, d, e)
+    #define PRINTF4(a, b, c, d)
+    #define PRINTF3(a, b, c)
+    #define PRINTF2(a, b)
+    #define PRINTF1(a)
+
     #define SOCKET_ERROR__ALLOC() \
         throw std::runtime_error(std::string("[malloc() error] "))
     #if defined(_WIN32)
@@ -118,6 +138,8 @@
         throw std::runtime_error(std::string("[send() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__CONNECT() \
         throw std::runtime_error(std::string("[connect() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
+    #define SOCKET_ERROR__SELECT() \
+        throw std::runtime_error(std::string("[select() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
 #endif
 
 #endif // SOCKET_SETUP_H

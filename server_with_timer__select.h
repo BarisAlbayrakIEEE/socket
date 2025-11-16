@@ -16,17 +16,17 @@ namespace ba_socket {
         SOCKET_STARTUP();
 
         // create the server socket and bind to the local address
-        printf("Creating socket for the server and binding it to the local address...\n");
+        PRINTF1("Creating socket for the server and binding it to the local address...\n");
         Socket socket_listen{ "localhost" };
         if (!socket_listen.is_valid()) return 1;
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        printf("Converting IPV6_V6ONLY socket to dual stack...\n");
+        PRINTF1("Converting IPV6_V6ONLY socket to dual stack...\n");
         if (!socket_listen.socketopt(1)) return 1;
 
         // listen for connections
-        printf("Listening for connections...(Ctrl+C to stop)\n");
+        PRINTF1("Listening for connections...(Ctrl+C to stop)\n");
         if (!socket_listen.listen(10)) return 1;
 
         // Accept loop
@@ -35,7 +35,7 @@ namespace ba_socket {
             ::signal(SIGINT, signal_handler);
             while (running) {
                 // accept a connection
-                printf("Accepting a connection...\n");
+                PRINTF1("Accepting a connection...\n");
                 fflush(stdout);
 
                 struct sockaddr_storage client_address;
@@ -57,15 +57,15 @@ namespace ba_socket {
         }
 
         // wait for clients to finish
-        printf("Waiting for clients to finish...\n");
+        PRINTF1("Waiting for clients to finish...\n");
         while (active_clients.load() > 0) {
-            printf("[Active clients: %d]\n", active_clients.load());
+            PRINTF2("[Active clients: %d]\n", active_clients.load());
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
-        printf("All clients finished.\n");
+        PRINTF1("All clients finished.\n");
 
         // close listening socket
-        printf("Closing listening socket...\n");
+        PRINTF1("Closing listening socket...\n");
         socket_listen.close();
 
         SOCKET_CLEANUP();

@@ -11,11 +11,11 @@ namespace ba_socket {
     std::atomic<int> active_clients{0};
     void handle_client(Socket&& socket_client, struct sockaddr_storage client_address, socklen_t client_len) {
         ++active_clients;
-        printf("[Active clients: %d]\n", active_clients.load());
+        PRINTF2("[Active clients: %d]\n", active_clients.load());
         
 #if defined(BA_SOCKET_DEBUG)
         // print client address
-        printf("Printing client address... ");
+        PRINTF1("Printing client address... ");
 
         char address_buffer[100];
         ::getnameinfo(
@@ -24,10 +24,10 @@ namespace ba_socket {
             address_buffer, sizeof(address_buffer),
             NULL, 0,
             NI_NUMERICHOST);
-        printf("[Client connected] %s\n", address_buffer);
+        PRINTF2("[Client connected] %s\n", address_buffer);
 
         // Read the request
-        printf("Reading the request...\n");
+        PRINTF1("Reading the request...\n");
         fflush(stdout);
 #endif
 
@@ -37,11 +37,11 @@ namespace ba_socket {
             --active_clients;
             return;
         }
-        printf("[Request from %s]\n%.*s\n", address_buffer, bytes_received, request);
+        PRINTF4("[Request from %s]\n%.*s\n", address_buffer, bytes_received, request);
         fflush(stdout);
 
         // send the response
-        printf("Sending the response...\n");
+        PRINTF1("Sending the response...\n");
 
         time_t timer;
         time(&timer);
@@ -62,7 +62,7 @@ namespace ba_socket {
         socket_client.send(body, strlen(body), 0);
 
         // close client socket (connection)
-        printf("Closing client socket (connection)...\n");
+        PRINTF1("Closing client socket (connection)...\n");
         socket_client.close();
 
         --active_clients;
