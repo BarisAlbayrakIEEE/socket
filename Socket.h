@@ -1,7 +1,7 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
-#include "socket_setup.h"
+#include "get_local_addr_to_bind.h"
 #include <stdexcept>
 #include <utility>
 #include <cstring>
@@ -16,18 +16,20 @@ namespace ba_socket {
                 SOCKET_ERROR__SOCKET();
             }
         }
-        Socket(uint16_t port, int domain = AF_INET6, int type = SOCK_STREAM, int flags = AI_PASSIVE) {
-            // get the local address to bind to
-            char port_str[8];
-            snprintf(port_str, sizeof(port_str), "%u", port);
-
-            struct addrinfo hints{};
-            hints.ai_family = domain;
-            hints.ai_socktype = type;
-            hints.ai_flags = flags;
-            struct addrinfo* bind_address = nullptr;
-            int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_address);
-            if (status != 0) {
+        Socket(
+            const std::string& bind_mode,
+            uint16_t port = 8080,
+            int domain = AF_INET6,
+            int socktype = SOCK_STREAM,
+            int flags = AI_PASSIVE)
+        {
+            // create the socket
+            struct addrinfo* bind_address = get_local_addr_to_bind(
+                bind_mode,
+                port,
+                domain,
+                socktype);
+            if (!bind_address) {
                 SOCKET_ERROR__GETADDRINFO();
             }
 
@@ -64,21 +66,12 @@ namespace ba_socket {
             return *this;
         };
 
-        // factory to use the default values of the bound constructor safely with temporary objects
-        static Socket create_bind_socket(
-            uint16_t port = 8080,
-            int domain = AF_INET6,
-            int type = SOCK_STREAM,
-            int flags = AI_PASSIVE) noexcept
-        {
-            return Socket(port, domain, type, flags);
-        }
-
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
         inline bool socketopt(int option) {
             if (setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, (void*)&option, sizeof(option))) {
                 SOCKET_ERROR__SETSOCKOPT();
+                return false;
             }
             return true;
         }
@@ -123,6 +116,7 @@ namespace ba_socket {
         inline bool listen(int backlog = 10) {
             if (::listen(_fd, backlog) < 0) {
                 SOCKET_ERROR__LISTEN();
+                return false;
             }
             return true;
         }
@@ -144,7 +138,7 @@ namespace ba_socket {
         }
 
         // Safe send
-        ssize_t send_all(const void* buffer, size_t length, int flags = 0) {
+        void send_all(const void* buffer, size_t length, int flags = 0) {
             size_t total_sent = 0;
             const char* buf = static_cast<const char*>(buffer);
             while (total_sent < length) {
@@ -179,6 +173,7 @@ namespace ba_socket {
         inline bool connect(const struct sockaddr* addr, socklen_t addrlen) {
             if (::connect(_fd, addr, addrlen) < 0) {
                 SOCKET_ERROR__CONNECT();
+                return false;
             }
             return true;
         }

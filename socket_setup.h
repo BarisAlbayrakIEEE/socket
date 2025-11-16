@@ -61,13 +61,14 @@
 
 #define BA_SOCKET_DEBUG
 #ifdef BA_SOCKET_DEBUG
+    #define SOCKET_ERROR__GETIFADDRS() \
+        fprintf(stderr, "[getifaddrs() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+    #define SOCKET_ERROR__GETADDRINFO() \
+        fprintf(stderr, "[getaddrinfo() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__SOCKET() \
         fprintf(stderr, "[socket() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__SETSOCKOPT() \
-        fprintf(stderr, "[setsockopt() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO()); \
-        return false
-    #define SOCKET_ERROR__GETADDRINFO() \
-        fprintf(stderr, "[getaddrinfo() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
+        fprintf(stderr, "[setsockopt() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__BIND() \
         fprintf(stderr, "[bind() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__LISTEN() \
@@ -85,12 +86,14 @@
         fprintf(stderr, "[connect() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO());    \
         return false
 #else
+    #define SOCKET_ERROR__GETIFADDRS() \
+        throw std::runtime_error(std::string("[getifaddrs() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
+    #define SOCKET_ERROR__GETADDRINFO() \
+        throw std::runtime_error(std::string("[getaddrinfo() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__SOCKET() \
         throw std::runtime_error(std::string("[socket() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__SETSOCKOPT() \
         throw std::runtime_error(std::string("[setsockopt() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__GETADDRINFO() \
-        throw std::runtime_error(std::string("[getaddrinfo() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__BIND() \
         throw std::runtime_error(std::string("[bind() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__LISTEN() \
