@@ -67,17 +67,21 @@ namespace ba_socket {
                         // receive data from the client
                         char read[1024];
                         int bytes_received = ::recv(i, read, 1024, 0);
+                        PRINTF1("[Server]: Receiving data from client...\n");
                         if (bytes_received < 1) {
                             FD_CLR(i, &master);
                             CLOSE_SOCKET(i);
                             continue;
                         }
+                        PRINTF4("[Server]: Received (%d bytes): %.*s", bytes_received, bytes_received, read);
 
                         // convert to uppercase and send back
+                        PRINTF1("[Server]: Updating data before ending to client...\n");
                         int j;
                         for (j = 0; j < bytes_received; ++j)
                             read[j] = toupper(read[j]);
                         ::send(i, read, bytes_received, 0);
+                        PRINTF4("[Server]: Sent (%d bytes): %.*s", bytes_received, bytes_received, read);
                     }
                 }
             }

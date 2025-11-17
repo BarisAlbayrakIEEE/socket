@@ -69,11 +69,12 @@ namespace ba_socket {
             if (FD_ISSET(fd_peer, &reads)) {
                 char read[4096];
                 int bytes_received = socket_peer.recv(read, 4096, 0);
+                PRINTF1("[Client]: Receiving data from peer...\n");
                 if (bytes_received < 1) {
-                    PRINTF1("Connection closed by peer.\n");
+                    PRINTF1("[Client]: Connection closed by peer.\n");
                     break;
                 }
-                PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+                PRINTF4("[Client]: Received (%d bytes): %.*s", bytes_received, bytes_received, read);
             }
 
             // check if data from stdin
@@ -83,10 +84,11 @@ namespace ba_socket {
             if(FD_ISSET(0, &reads)) {
 #endif
                 char read[4096];
+                PRINTF1("[Client]: Reading user input to send to peer...\n");
                 if (!fgets(read, 4096, stdin)) break; // EOF
-                PRINTF2("Sending: %s", read);
+                PRINTF2("[Client]: Sending: %s", read);
                 int bytes_sent = socket_peer.send(read, strlen(read), 0);
-                PRINTF2("Sent %d bytes.\n", bytes_sent);
+                PRINTF2("[Client]: Sent %d bytes.\n", bytes_sent);
             }
         }
 
