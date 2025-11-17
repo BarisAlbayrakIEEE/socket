@@ -1,3 +1,5 @@
+// TCP_client.h
+
 #ifndef TCP_CLIENT_H
 #define TCP_CLIENT_H
 
@@ -8,7 +10,7 @@
 #endif
 
 namespace ba_socket {
-    int create_TCP_client(const std::string& hostname = "localhost", uint16_t port = 8080) {
+    int TCP_client(const std::string& hostname = "localhost", uint16_t port = 8080) {
         SOCKET_STARTUP();
 
         // obtain the peer address
@@ -26,25 +28,20 @@ namespace ba_socket {
             peer_addr->ai_protocol};
         if (!socket_peer.is_valid()) {
             SOCKET_ERROR__SOCKET();
-            freeaddrinfo(peer_addr);
+            ::freeaddrinfo(peer_addr);
             return 1;
         }
         SOCKET fd_peer = socket_peer.native_handle();
 
         // connect to the remote server
         PRINTF1("Connecting to the remote server...\n");
-        if (
-            connect(
-                fd_peer,
-                peer_addr->ai_addr,
-                peer_addr->ai_addrlen))
-        {
-            freeaddrinfo(peer_addr);
+        if (!socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen)) {
+            ::freeaddrinfo(peer_addr);
             return 1;
         }
-        freeaddrinfo(peer_addr);
+        ::freeaddrinfo(peer_addr);
 
-        // let the user enter data to send via stdin
+        // inform the user
         PRINTF1("Connected to the remote server.\n");
         PRINTF1("To send data, enter text followed by enter.\n");
 
@@ -58,11 +55,12 @@ namespace ba_socket {
             FD_SET(0, &reads); // on unix/linux, stdin fd = 0
 #endif
 
-            // wait for data on either socket
+            // wait for data on socket
+            // as windows doesn't support fd_set for stdin, we use a timeout loop
             struct timeval timeout;
             timeout.tv_sec = 0;
             timeout.tv_usec = 100000;
-            if (select(fd_peer + 1, &reads, 0, 0, &timeout) < 0) {
+            if (::select(fd_peer + 1, &reads, 0, 0, &timeout) < 0) {
                 SOCKET_ERROR__SELECT();
                 return 1;
             }
@@ -85,7 +83,7 @@ namespace ba_socket {
             if(FD_ISSET(0, &reads)) {
 #endif
                 char read[4096];
-                if (!fgets(read, 4096, stdin)) break;
+                if (!fgets(read, 4096, stdin)) break; // EOF
                 PRINTF2("Sending: %s", read);
                 int bytes_sent = socket_peer.send(read, strlen(read), 0);
                 PRINTF2("Sent %d bytes.\n", bytes_sent);

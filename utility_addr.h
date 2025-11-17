@@ -1,3 +1,5 @@
+// utility_addr.h
+
 #ifndef UTILITY_ADDR_H
 #define UTILITY_ADDR_H
 
@@ -5,7 +7,7 @@
 #include <cstring>
 
 namespace ba_socket {
-    struct addrinfo* get_addrinfo(
+    inline struct addrinfo* get_addrinfo(
         int socktype = SOCK_STREAM,
         const std::string& hostname = "localhost",
         uint16_t port = 8080)
@@ -24,7 +26,7 @@ namespace ba_socket {
     }
 
     template <bool Is_Debug_Mode>
-    void print_sockaddr(struct sockaddr_storage sockaddr_, socklen_t socklen) {
+    inline void print_sockaddr(struct sockaddr_storage sockaddr_, socklen_t socklen) {
         // print the peer address
         PRINTF1("Printing the socket address...\n");
         char buffer_addr[256];
@@ -40,14 +42,14 @@ namespace ba_socket {
         PRINTF3("%s %s\n", buffer_addr, buffer_service);
     }
     template <>
-    void print_sockaddr<false>(struct sockaddr_storage sockaddr_, socklen_t socklen) {
+    inline void print_sockaddr<false>(struct sockaddr_storage sockaddr_, socklen_t socklen) {
         ;
     }
 
     template <bool Is_Debug_Mode>
-    void print_addrinfo(struct addrinfo* addrinfo_) {
+    inline void print_addrinfo(struct addrinfo* addrinfo_) {
         // print the peer address
-        PRINTF1("Printing the socket address...\n");
+        PRINTF1("Printing the address info...\n");
         char buffer_addr[256];
         char buffer_service[256];
         ::getnameinfo(
@@ -61,7 +63,7 @@ namespace ba_socket {
         PRINTF3("%s %s\n", buffer_addr, buffer_service);
     }
     template <>
-    void print_addrinfo<false>(struct addrinfo* addrinfo_) {
+    inline void print_addrinfo<false>(struct addrinfo* addrinfo_) {
         ;
     }
 } // namespace ba_socket

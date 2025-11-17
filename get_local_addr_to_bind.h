@@ -1,3 +1,5 @@
+// get_local_addr_to_bind.h
+
 #ifndef GET_LOCAL_ADDR_TO_BIND_H
 #define GET_LOCAL_ADDR_TO_BIND_H
 
@@ -56,10 +58,7 @@ namespace ba_socket {
         hints.ai_flags    = AI_PASSIVE;
 
         // obtain the peer address
-        struct addrinfo *bind_addr = get_addrinfo(
-            socktype,
-            node.empty() ? nullptr : node.c_str(),
-            port);
+        struct addrinfo *bind_addr = get_addrinfo(socktype, node, port);
         return bind_addr;
     }
 } // namespace ba_socket
