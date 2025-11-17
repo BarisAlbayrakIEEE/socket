@@ -89,14 +89,14 @@ namespace ba_socket {
         }
 
         // Create the local bind address for any interface on given port
-        bool bind_any(uint16_t port, int family = AF_INET6) {
+        bool bind_any(uint16_t port, int family = AF_INET6, int socktype = SOCK_STREAM) {
             // get the local address to bind to
             char port_str[8];
             snprintf(port_str, sizeof(port_str), "%u", port);
 
             struct addrinfo hints{};
             hints.ai_family = family;
-            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_socktype = socktype;
             hints.ai_flags = AI_PASSIVE;
             struct addrinfo* bind_address = nullptr;
             int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_address);
