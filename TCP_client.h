@@ -16,9 +16,7 @@ namespace ba_socket {
         if (!peer_addr) return 1;
 
         // print the peer address
-#if defined(BA_SOCKET_DEBUG)
-        print_addrinfo(peer_addr);
-#endif
+        PRINT_ADDRINFO(peer_addr);
 
         // create the peer socket
         PRINTF1("Creating the peer socket...\n");
