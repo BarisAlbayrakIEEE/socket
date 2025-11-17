@@ -21,7 +21,7 @@ namespace ba_socket {
         print_addrinfo<is_debug_mode>(peer_addr);
 
         // create the peer socket
-        PRINTF1("Creating the peer socket...\n");
+        PRINTF1("[Client]: Creating the peer socket...\n");
         Socket socket_peer{
             peer_addr->ai_family,
             peer_addr->ai_socktype,
@@ -34,7 +34,7 @@ namespace ba_socket {
         SOCKET fd_peer = socket_peer.native_handle();
 
         // connect to the remote server
-        PRINTF1("Connecting to the remote server...\n");
+        PRINTF1("[Client]: Connecting to the remote server...\n");
         if (!socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen)) {
             ::freeaddrinfo(peer_addr);
             return 1;
@@ -42,8 +42,8 @@ namespace ba_socket {
         ::freeaddrinfo(peer_addr);
 
         // inform the user
-        PRINTF1("Connected to the remote server.\n");
-        PRINTF1("To send data, enter text followed by enter.\n");
+        PRINTF1("[Client]: Connected to the remote server.\n");
+        PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // loop for the data transfer: terminal -> server OR server -> terminal
         while(1) {
@@ -93,7 +93,7 @@ namespace ba_socket {
         }
 
         // close the peer socket
-        PRINTF1("Closing the peer socket...\n");
+        PRINTF1("[Client]: Closing the peer socket...\n");
         socket_peer.close();
 
         SOCKET_CLEANUP();

@@ -13,18 +13,13 @@ namespace ba_socket {
         SOCKET_STARTUP();
 
         // create the server socket and bind to the local address
-        PRINTF1("Creating socket for the server and binding it to the local address...\n");
-        Socket socket_listen{ "localhost" };
+        PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
+        Socket socket_listen{ Socket::create_socket_bind_to_local_addr("localhost") };
         if (!socket_listen.is_valid()) return 1;
         SOCKET fd_listen = socket_listen.native_handle();
 
-        // convert IPV6_V6ONLY socket to dual stack.
-        // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        PRINTF1("Converting IPV6_V6ONLY socket to dual stack...\n");
-        if (!socket_listen.set_sockopt()) return 1;
-
         // listen for connections
-        PRINTF1("Listening for connections...(Ctrl+C to stop)\n");
+        PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
         if (!socket_listen.listen(10)) return 1;
 
         // create the fd_set
@@ -33,7 +28,7 @@ namespace ba_socket {
         FD_SET(fd_listen, &master);
         SOCKET fd_max = fd_listen;
 
-        PRINTF1("Waiting for connections...\n");
+        PRINTF1("[Server]: Waiting for connections...\n");
         while(1) {
             fd_set reads;
             reads = master;
@@ -46,7 +41,7 @@ namespace ba_socket {
                 if (FD_ISSET(i, &reads)) {
                     if (i == fd_listen) { // server socket
                         // accept a new connection
-                        PRINTF1("Accepting a new connection...\n");
+                        PRINTF1("[Server]: Accepting a new connection...\n");
                         fflush(stdout);
                         struct sockaddr_storage client_addr;
                         socklen_t client_len = sizeof(client_addr);
@@ -95,7 +90,7 @@ namespace ba_socket {
         }
 
         // close the listening socket
-        PRINTF1("Closing the listening socket...\n");
+        PRINTF1("[Server]: Closing the listening socket...\n");
         socket_listen.close();
 
         SOCKET_CLEANUP();

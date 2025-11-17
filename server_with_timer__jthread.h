@@ -17,7 +17,7 @@ namespace ba_socket {
 
         // create the server socket and bind to the local address
         PRINTF1("Creating socket for the server and binding it to the local address...\n");
-        Socket socket_listen{ "localhost" };
+        Socket socket_listen{ Socket::create_socket_bind_to_local_addr("localhost") };
         if (!socket_listen.is_valid()) return 1;
 
         // convert IPV6_V6ONLY socket to dual stack.

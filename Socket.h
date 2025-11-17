@@ -12,48 +12,13 @@
 namespace ba_socket {
     class Socket {
     public:
+        explicit Socket(SOCKET fd) noexcept : _fd(fd) {};
         Socket(int domain, int type, int protocol) {
             _fd = ::socket(domain, type, protocol);
             if (!IS_VALID_SOCKET(_fd)) {
                 SOCKET_ERROR__SOCKET();
             }
         }
-        Socket(
-            const std::string& bind_mode,
-            uint16_t port = 8080,
-            int domain = AF_INET6,
-            int socktype = SOCK_STREAM,
-            int flags = AI_PASSIVE)
-        {
-            // create the socket
-            struct addrinfo* bind_address = get_local_addr_to_bind(
-                bind_mode,
-                port,
-                domain,
-                socktype);
-            if (!bind_address) {
-                SOCKET_ERROR__GETADDRINFO();
-                return;
-            }
-
-            // create the socket
-            _fd = ::socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
-            if (!IS_VALID_SOCKET(_fd)) {
-                SOCKET_ERROR__SOCKET();
-                return;
-            }
-            
-            // bind the socket to the local address
-            if (::bind(_fd, bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
-                ::freeaddrinfo(bind_address);
-                SOCKET_ERROR__BIND();
-                return;
-            }
-
-            // free the address info
-            ::freeaddrinfo(bind_address);
-        }
-        explicit Socket(SOCKET fd) noexcept : _fd(fd) {};
         ~Socket() { close(); };
 
         // non-copyable but movable
@@ -71,8 +36,67 @@ namespace ba_socket {
             return *this;
         };
 
-        // convert IPV6_V6ONLY socket to dual stack.
-        // disable IPV6_V6ONLY to accept both IPv4 and IPv6
+        // factory for a socket bound to local address
+        static Socket create_socket_bind_to_local_addr(
+            const std::string& bind_mode,
+            uint16_t port = 8080,
+            int domain = AF_INET6,
+            int socktype = SOCK_STREAM,
+            int flags = AI_PASSIVE)
+        {
+            // create the socket
+            struct addrinfo* bind_address = get_local_addr_to_bind(
+                bind_mode,
+                port,
+                domain,
+                socktype);
+            if (!bind_address) {
+                SOCKET_ERROR__GETADDRINFO();
+                return Socket(INVALID_SOCKET);
+            }
+
+            // create the socket
+            SOCKET fd = ::socket(
+                bind_address->ai_family,
+                bind_address->ai_socktype,
+                bind_address->ai_protocol);
+            if (!IS_VALID_SOCKET(fd)) {
+                SOCKET_ERROR__SOCKET();
+                return Socket(INVALID_SOCKET);
+            }
+            Socket socket_{fd};
+
+            // convert IPV6_V6ONLY socket to dual stack.
+            // disable IPV6_V6ONLY to accept both IPv4 and IPv6
+            if (!socket_.set_sockopt()) return Socket(INVALID_SOCKET);
+            
+            // bind the socket to the local address
+            if (socket_.bind(bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
+                ::freeaddrinfo(bind_address);
+                SOCKET_ERROR__BIND();
+                return Socket(INVALID_SOCKET);
+            }
+
+            // free the address info
+            ::freeaddrinfo(bind_address);
+
+            return socket_;
+        }
+
+        inline int get_sockopt(int level = SOL_SOCKET, int optname = SO_DOMAIN) {
+            int optval = 0;
+            socklen_t optlen = sizeof(optval);
+            if (::getsockopt(_fd, level, optname, (void*)&optval, &optlen)) {
+                SOCKET_ERROR__SETSOCKOPT();
+                return -1;
+            }
+            return optval;
+        }
+
+        // set socket option
+        // defaults:
+        //   convert IPV6_V6ONLY socket to dual stack.
+        //   disable IPV6_V6ONLY to accept both IPv4 and IPv6
         inline bool set_sockopt(int level = IPPROTO_IPV6, int optname = IPV6_V6ONLY, int optval = 0) {
             if (::setsockopt(_fd, level, optname, (void*)&optval, sizeof(optval))) {
                 SOCKET_ERROR__SETSOCKOPT();
