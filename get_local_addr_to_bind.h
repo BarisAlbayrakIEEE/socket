@@ -2,6 +2,7 @@
 #define GET_LOCAL_ADDR_TO_BIND_H
 
 #include "get_local_addrs_uniform.h"
+#include "utility_addr.h"
 #include <string>
 
 namespace ba_socket {

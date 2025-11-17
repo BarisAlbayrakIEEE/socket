@@ -63,6 +63,7 @@
 
 #define BA_SOCKET_DEBUG
 #ifdef BA_SOCKET_DEBUG
+    static const bool is_debug_mode = true;
     #define PRINTF8(a, b, c, d, e, f, g, h) printf(a, b, c, d, e, f, g, h)
     #define PRINTF7(a, b, c, d, e, f, g) printf(a, b, c, d, e, f, g)
     #define PRINTF6(a, b, c, d, e, f) printf(a, b, c, d, e, f)
@@ -102,6 +103,7 @@
     #define SOCKET_ERROR__SELECT() \
         fprintf(stderr, "[select() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #else
+    static const bool is_debug_mode = false;
     #define PRINTF8(a, b, c, d, e, f, g, h)
     #define PRINTF7(a, b, c, d, e, f, g)
     #define PRINTF6(a, b, c, d, e, f)

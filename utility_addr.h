@@ -23,37 +23,47 @@ namespace ba_socket {
         return socket_addr;
     }
 
-#if defined(BA_SOCKET_DEBUG)
-    #define PRINT_SOCKADDR(sockaddr_, socklen)             \
-        PRINTF1("Printing the socket address...\n");       \
-        char buffer_addr[256];                             \
-        char buffer_service[256];                          \
-        ::getnameinfo(                                     \
-            (struct sockaddr*)&sockaddr_,                  \
-            socklen,                                       \
-            buffer_addr,                                   \
-            sizeof(buffer_addr),                           \
-            buffer_service,                                \
-            sizeof(buffer_service),                        \
-            NI_NUMERICHOST);                               \
-        PRINTF3("%s %s\n", buffer_addr, buffer_service)
-    #define PRINT_ADDRINFO(addrinfo_)                      \
-        PRINTF1("Printing the socket address...\n");       \
-        char buffer_addr[256];                             \
-        char buffer_service[256];                          \
-        ::getnameinfo(                                     \
-            addrinfo_->ai_addr,                            \
-            addrinfo_->ai_addrlen,                         \
-            buffer_addr,                                   \
-            sizeof(buffer_addr),                           \
-            buffer_service,                                \
-            sizeof(buffer_service),                        \
-            NI_NUMERICHOST);                               \
-        PRINTF3("%s %s\n", buffer_addr, buffer_service)
-#else
-    #define PRINT_SOCKADDR(sockaddr, socklen)
-    #define PRINT_ADDRINFO(sockaddr)
-#endif
+    template <bool Is_Debug_Mode>
+    void print_sockaddr(struct sockaddr_storage sockaddr_, socklen_t socklen) {
+        // print the peer address
+        PRINTF1("Printing the socket address...\n");
+        char buffer_addr[256];
+        char buffer_service[256];
+        ::getnameinfo(
+            (struct sockaddr*)&sockaddr_,
+            socklen,
+            buffer_addr,
+            sizeof(buffer_addr),
+            buffer_service,
+            sizeof(buffer_service),
+            NI_NUMERICHOST);
+        PRINTF3("%s %s\n", buffer_addr, buffer_service);
+    }
+    template <>
+    void print_sockaddr<false>(struct sockaddr_storage sockaddr_, socklen_t socklen) {
+        ;
+    }
+
+    template <bool Is_Debug_Mode>
+    void print_addrinfo(struct addrinfo* addrinfo_) {
+        // print the peer address
+        PRINTF1("Printing the socket address...\n");
+        char buffer_addr[256];
+        char buffer_service[256];
+        ::getnameinfo(
+            addrinfo_->ai_addr,
+            addrinfo_->ai_addrlen,
+            buffer_addr,
+            sizeof(buffer_addr),
+            buffer_service,
+            sizeof(buffer_service),
+            NI_NUMERICHOST);
+        PRINTF3("%s %s\n", buffer_addr, buffer_service);
+    }
+    template <>
+    void print_addrinfo<false>(struct addrinfo* addrinfo_) {
+        ;
+    }
 } // namespace ba_socket
 
 #endif // UTILITY_ADDR_H

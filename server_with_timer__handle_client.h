@@ -15,7 +15,7 @@ namespace ba_socket {
         PRINTF2("[Active clients: %d]\n", active_clients.load());
 
         // print the client address
-        PRINT_SOCKADDR(client_addr, client_len);
+        print_sockaddr<is_debug_mode>(client_addr, client_len);
 
         // Read the request
         PRINTF1("Reading the request...\n");
