@@ -21,7 +21,7 @@ namespace ba_socket {
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
         PRINTF1("Converting IPV6_V6ONLY socket to dual stack...\n");
-        if (!socket_listen.socketopt(0)) return 1;
+        if (!socket_listen.socketopt()) return 1;
 
         // listen for connections
         PRINTF1("Listening for connections...(Ctrl+C to stop)\n");

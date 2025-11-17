@@ -73,8 +73,8 @@ namespace ba_socket {
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        inline bool socketopt(int option = 0) {
-            if (::setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, (void*)&option, sizeof(option))) {
+        inline bool socketopt(int optname = IPPROTO_IPV6, int optval = IPV6_V6ONLY, int option = 0) {
+            if (::setsockopt(_fd, optname, optval, (void*)&option, sizeof(option))) {
                 SOCKET_ERROR__SETSOCKOPT();
                 return false;
             }
