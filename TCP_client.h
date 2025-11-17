@@ -43,11 +43,10 @@ namespace ba_socket {
 
         // inform the user
         PRINTF1("[Client]: Connected to the remote server.\n");
+        PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // loop for the data transfer: terminal -> server OR server -> terminal
         while(1) {
-            PRINTF1("[Client]: To send data, enter text followed by enter.\n");
-
             // create the fd_set
             fd_set reads;
             FD_ZERO(&reads);
