@@ -6,6 +6,7 @@
 #include "Socket.h"
 #include "utility_addr.h"
 #include <ctype.h>
+#include <vector>
 
 namespace ba_socket {
     int TCP_server() {
@@ -49,17 +50,17 @@ namespace ba_socket {
                         fflush(stdout);
                         struct sockaddr_storage client_addr;
                         socklen_t client_len = sizeof(client_addr);
-                        Socket socket_client = socket_listen.accept(
+                        SOCKET fd_client = ::accept(
+                            fd_listen,
                             (struct sockaddr*) &client_addr,
                             &client_len);
-                        if (!socket_client.is_valid()) {
+                        if (!IS_VALID_SOCKET(fd_client)) {
                             SOCKET_ERROR__ACCEPT();
                             return 1;
                         }
                         print_sockaddr<is_debug_mode>(client_addr, client_len);
 
                         // add the new client socket to the master set
-                        SOCKET fd_client = socket_client.native_handle();
                         FD_SET(fd_client, &master);
                         if (fd_client > fd_max) fd_max = fd_client;
                     } else { // client socket
