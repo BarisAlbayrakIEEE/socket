@@ -9,6 +9,8 @@
 
 namespace ba_socket {
     inline std::string get_ip_of_interface(const std::string& ifname) {
+        PRINTF1("Obtaining the address matched by name...\n");
+
         Uniform_Addr uniform_addrs[100];
         size_t count = get_local_addrs_uniform(uniform_addrs, 100);
         for (size_t i = 0; i < count; ++i) {
@@ -38,6 +40,8 @@ namespace ba_socket {
         int family = AF_INET6,
         int socktype = SOCK_STREAM)
     {
+        PRINTF1("Obtaining the local address to bind...\n");
+
         std::string node;
         if (bind_mode == "all" || bind_mode == "any") {
             node.clear(); // == nullptr
@@ -58,7 +62,7 @@ namespace ba_socket {
         hints.ai_flags    = AI_PASSIVE;
 
         // obtain the peer address
-        struct addrinfo *bind_addr = get_addrinfo(socktype, node, port);
+        struct addrinfo *bind_addr = get_addrinfo(socktype, node, port, family);
         return bind_addr;
     }
 } // namespace ba_socket

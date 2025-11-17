@@ -80,6 +80,8 @@ namespace ba_socket {
     #else
         // get uniform address - linux/unix
         size_t get_local_addrs_uniform(Uniform_Addr *uniform_addrs, size_t max) {
+            PRINTF1("Obtaining all addresses...\n");
+
             struct ifaddrs *ifaddrs_;
             if (getifaddrs(&ifaddrs_) == -1) {
                 SOCKET_ERROR__GETIFADDRS();

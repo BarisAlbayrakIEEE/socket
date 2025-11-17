@@ -36,53 +36,10 @@ namespace ba_socket {
             return *this;
         };
 
-        // factory for a socket bound to local address
-        static Socket create_socket_bind_to_local_addr(
-            const std::string& bind_mode,
-            uint16_t port = 8080,
-            int domain = AF_INET6,
-            int socktype = SOCK_STREAM,
-            int flags = AI_PASSIVE)
-        {
-            // create the socket
-            struct addrinfo* bind_address = get_local_addr_to_bind(
-                bind_mode,
-                port,
-                domain,
-                socktype);
-            if (!bind_address) {
-                SOCKET_ERROR__GETADDRINFO();
-                return Socket(INVALID_SOCKET);
-            }
-
-            // create the socket
-            SOCKET fd = ::socket(
-                bind_address->ai_family,
-                bind_address->ai_socktype,
-                bind_address->ai_protocol);
-            if (!IS_VALID_SOCKET(fd)) {
-                SOCKET_ERROR__SOCKET();
-                return Socket(INVALID_SOCKET);
-            }
-            Socket socket_{fd};
-
-            // convert IPV6_V6ONLY socket to dual stack.
-            // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-            if (!socket_.set_sockopt()) return Socket(INVALID_SOCKET);
-            
-            // bind the socket to the local address
-            if (socket_.bind(bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
-                ::freeaddrinfo(bind_address);
-                SOCKET_ERROR__BIND();
-                return Socket(INVALID_SOCKET);
-            }
-
-            // free the address info
-            ::freeaddrinfo(bind_address);
-
-            return socket_;
-        }
-
+        // get socket option
+        // defaults:
+        //   level = SOL_SOCKET
+        //   optname = SO_DOMAIN
         inline int get_sockopt(int level = SOL_SOCKET, int optname = SO_DOMAIN) {
             int optval = 0;
             socklen_t optlen = sizeof(optval);
@@ -231,6 +188,57 @@ namespace ba_socket {
     private:
         SOCKET _fd;
     };
+
+    // convenience function to createe a socket bound to local address
+    Socket create_socket_bind_to_local_addr(
+        const std::string& bind_mode,
+        uint16_t port = 8080,
+        int domain = AF_INET6,
+        int socktype = SOCK_STREAM,
+        int flags = AI_PASSIVE)
+    {
+        // create the socket
+        struct addrinfo* bind_address = get_local_addr_to_bind(
+            bind_mode,
+            port,
+            domain,
+            socktype);
+        if (!bind_address) {
+            SOCKET_ERROR__GETADDRINFO();
+            return Socket(INVALID_SOCKET);
+        }
+
+        // create the socket
+        SOCKET fd = ::socket(
+            bind_address->ai_family,
+            bind_address->ai_socktype,
+            bind_address->ai_protocol);
+        if (!IS_VALID_SOCKET(fd)) {
+            SOCKET_ERROR__SOCKET();
+            return Socket(INVALID_SOCKET);
+        }
+        Socket socket_{fd};
+
+        // convert IPV6_V6ONLY socket to dual stack.
+        // disable IPV6_V6ONLY to accept both IPv4 and IPv6
+        int v6only = socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY);
+        if (
+            socket_.get_sockopt(SOL_SOCKET, SO_DOMAIN) == AF_INET6 &&
+            socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY) &&
+            !socket_.set_sockopt()) return Socket(INVALID_SOCKET);
+        
+        // bind the socket to the local address
+        if (socket_.bind(bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
+            ::freeaddrinfo(bind_address);
+            SOCKET_ERROR__BIND();
+            return Socket(INVALID_SOCKET);
+        }
+
+        // free the address info
+        ::freeaddrinfo(bind_address);
+
+        return socket_;
+    }
 } // namespace ba_socket
 
 #endif // SOCKET_H

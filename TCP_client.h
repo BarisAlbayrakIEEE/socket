@@ -10,11 +10,11 @@
 #endif
 
 namespace ba_socket {
-    int TCP_client(const std::string& hostname = "localhost", uint16_t port = 8080) {
+    int TCP_client(const std::string& hostname = "localhost", uint16_t port = 8080, int family = AF_INET6) {
         SOCKET_STARTUP();
 
         // obtain the peer address
-        struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port);
+        struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
         if (!peer_addr) return 1;
 
         // print the peer address
@@ -43,10 +43,11 @@ namespace ba_socket {
 
         // inform the user
         PRINTF1("[Client]: Connected to the remote server.\n");
-        PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // loop for the data transfer: terminal -> server OR server -> terminal
         while(1) {
+            PRINTF1("[Client]: To send data, enter text followed by enter.\n");
+
             // create the fd_set
             fd_set reads;
             FD_ZERO(&reads);

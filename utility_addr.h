@@ -10,17 +10,27 @@ namespace ba_socket {
     inline struct addrinfo* get_addrinfo(
         int socktype = SOCK_STREAM,
         const std::string& hostname = "localhost",
-        uint16_t port = 8080)
+        uint16_t port = 8080,
+        int family = AF_UNSPEC)
     {
-        PRINTF1("Obtaining the peer address...\n");
+        PRINTF1("Obtaining the address info...\n");
         std::string port_str(std::to_string(port));
         struct addrinfo hints;
         memset(&hints, 0, sizeof(hints));
         hints.ai_socktype = socktype;
+        hints.ai_family = family;
         struct addrinfo *socket_addr;
-        if (::getaddrinfo(hostname.c_str(), port_str.c_str(), &hints, &socket_addr)) {
-            SOCKET_ERROR__GETADDRINFO();
-            return nullptr;
+        if (hostname.empty()) {
+            if (::getaddrinfo(nullptr, port_str.c_str(), &hints, &socket_addr)) {
+                SOCKET_ERROR__GETADDRINFO();
+                return nullptr;
+            }
+        }
+        else {
+            if (::getaddrinfo(hostname.c_str(), port_str.c_str(), &hints, &socket_addr)) {
+                SOCKET_ERROR__GETADDRINFO();
+                return nullptr;
+            }
         }
         return socket_addr;
     }

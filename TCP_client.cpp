@@ -11,6 +11,6 @@ int main(int argc, char *argv[]) {
     
     std::string hostname = argv[1];
     uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
-    int status = TCP_client(hostname, port);
+    int status = TCP_client(hostname, port, AF_INET6);
     return status;
 }
