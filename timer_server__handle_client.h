@@ -12,9 +12,16 @@ namespace ba_socket {
 
     // Worker thread: handles a single client connection
     std::atomic<int> active_clients{0};
-    void handle_client(Socket&& socket_client, struct sockaddr_storage client_addr, socklen_t client_len) {
+    void handle_client(
+        SOCKET fd_client,
+        struct sockaddr_storage client_addr,
+        socklen_t client_len)
+    {
         ++active_clients;
         PRINTF2("[Active clients: %d]\n", active_clients.load());
+
+        // create socket RAII wrapper
+        Socket socket_client(std::move(fd_client));
 
         // print the client address
         print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -50,10 +57,6 @@ namespace ba_socket {
             strlen(body));
         socket_client.send(header, strlen(header), 0);
         socket_client.send(body, strlen(body), 0);
-
-        // close client socket (connection)
-        PRINTF1("Closing client socket (connection)...\n");
-        socket_client.close();
 
         --active_clients;
     }

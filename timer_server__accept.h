@@ -26,6 +26,7 @@ namespace ba_socket {
         PRINTF1("Creating socket for the server and binding it to the local address...\n");
         Socket socket_listen = create_socket_bind_to_local_addr("all");
         if (!socket_listen.is_valid()) return 1;
+        SOCKET fd_listen = socket_listen.native_handle();
 
         // listen for connections
         PRINTF1("Listening for connections...(Ctrl+C to stop)\n");
@@ -39,12 +40,13 @@ namespace ba_socket {
                 PRINTF1("Accepting a connection...\n");
                 fflush(stdout);
 
-                struct sockaddr_storage client_address;
-                socklen_t client_len = sizeof(client_address);
-                Socket socket_client = socket_listen.accept(
-                    (struct sockaddr*)&client_address,
+                struct sockaddr_storage client_addr;
+                socklen_t client_len = sizeof(client_addr);
+                SOCKET fd_client = ::accept(
+                    fd_listen,
+                    (struct sockaddr*)&client_addr,
                     &client_len);
-                if (!socket_client.is_valid()) {
+                if (!IS_VALID_SOCKET(fd_client)) {
                     if (GET_SOCKET_ERRNO() == EINTR) continue;   // accept interrupted by Ctrl+C
                     SOCKET_ERROR__ACCEPT();
                     return 1;
@@ -52,13 +54,13 @@ namespace ba_socket {
 
                 // Spawn a thread per client
                 if (!running) {
-                    socket_client.close();
+                    CLOSE_SOCKET(fd_client);
                     break;
                 }
                 client_threads.emplace_back(
                     handle_client,
-                    std::move(socket_client),
-                    client_address,
+                    fd_client,
+                    client_addr,
                     client_len);
             }
         }

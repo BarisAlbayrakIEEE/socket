@@ -54,25 +54,21 @@ namespace ba_socket {
                         // accept a new connection
                         struct sockaddr_storage client_addr;
                         socklen_t client_len = sizeof(client_addr);
-                        Socket socket_client = socket_listen.accept(
+                        SOCKET fd_client = ::accept(
+                            fd_listen,
                             (struct sockaddr*)&client_addr,
                             &client_len);
-                        if (!socket_client.is_valid()) {
+                        if (!IS_VALID_SOCKET(fd_client)) {
                             if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
                             SOCKET_ERROR__ACCEPT();
                             return 1;
                         }
-                        SOCKET fd_client = socket_client.native_handle();
                         print_sockaddr<is_debug_mode>(client_addr, client_len);
-
-                        // add the new client socket to the master set
-                        FD_SET(fd_client, &master);
-                        if (fd_client > fd_max) fd_max = fd_client;
 
                         // Spawn handler thread
                         client_threads.emplace_back(
                             handle_client,
-                            std::move(socket_client),
+                            fd_client,
                             client_addr,
                             client_len
                         );
