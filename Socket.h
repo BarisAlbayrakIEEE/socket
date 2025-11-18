@@ -81,22 +81,22 @@ namespace ba_socket {
             hints.ai_family = family;
             hints.ai_socktype = socktype;
             hints.ai_flags = AI_PASSIVE;
-            struct addrinfo* bind_address = nullptr;
-            int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_address);
+            struct addrinfo* bind_addr = nullptr;
+            int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_addr);
             if (status != 0) {
                 SOCKET_ERROR__GETADDRINFO();
                 return false;
             }
 
             // bind the socket to the local address
-            if (::bind(_fd, bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
-                ::freeaddrinfo(bind_address);
+            if (::bind(_fd, bind_addr->ai_addr, bind_addr->ai_addrlen) < 0) {
+                ::freeaddrinfo(bind_addr);
                 SOCKET_ERROR__BIND();
                 return false;
             }
 
             // free the address info
-            ::freeaddrinfo(bind_address);
+            ::freeaddrinfo(bind_addr);
             return true;
         }
 
@@ -198,21 +198,21 @@ namespace ba_socket {
         int flags = AI_PASSIVE)
     {
         // create the socket
-        struct addrinfo* bind_address = get_local_addr_to_bind(
+        struct addrinfo* bind_addr = get_local_addr_to_bind(
             bind_mode,
             port,
             domain,
             socktype);
-        if (!bind_address) {
+        if (!bind_addr) {
             SOCKET_ERROR__GETADDRINFO();
             return Socket(INVALID_SOCKET);
         }
 
         // create the socket
         SOCKET fd = ::socket(
-            bind_address->ai_family,
-            bind_address->ai_socktype,
-            bind_address->ai_protocol);
+            bind_addr->ai_family,
+            bind_addr->ai_socktype,
+            bind_addr->ai_protocol);
         if (!IS_VALID_SOCKET(fd)) {
             SOCKET_ERROR__SOCKET();
             return Socket(INVALID_SOCKET);
@@ -225,17 +225,38 @@ namespace ba_socket {
         if (
             socket_.get_sockopt(SOL_SOCKET, SO_DOMAIN) == AF_INET6 &&
             socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY) &&
-            !socket_.set_sockopt()) return Socket(INVALID_SOCKET);
-        
+            !socket_.set_sockopt())
+        {
+            ::freeaddrinfo(bind_addr);
+            SOCKET_ERROR__SETSOCKOPT();
+            return Socket(INVALID_SOCKET);
+        }
+
+        // reuse the address and port
+        int reuseaddr = 1;
+        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr)) < 0) {
+            ::freeaddrinfo(bind_addr);
+            SOCKET_ERROR__SETSOCKOPT();
+            return Socket(INVALID_SOCKET);
+        }
+#if defined(SO_REUSEPORT)
+        int reuseport = 1;
+        if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuseport, sizeof(reuseport)) < 0) {
+            ::freeaddrinfo(bind_addr);
+            SOCKET_ERROR__SETSOCKOPT();
+            return Socket(INVALID_SOCKET);
+        }
+#endif
+
         // bind the socket to the local address
-        if (socket_.bind(bind_address->ai_addr, bind_address->ai_addrlen) < 0) {
-            ::freeaddrinfo(bind_address);
+        if (socket_.bind(bind_addr->ai_addr, bind_addr->ai_addrlen) < 0) {
+            ::freeaddrinfo(bind_addr);
             SOCKET_ERROR__BIND();
             return Socket(INVALID_SOCKET);
         }
 
         // free the address info
-        ::freeaddrinfo(bind_address);
+        ::freeaddrinfo(bind_addr);
 
         return socket_;
     }
