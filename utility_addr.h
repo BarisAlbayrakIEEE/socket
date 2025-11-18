@@ -11,7 +11,8 @@ namespace ba_socket {
         int socktype = SOCK_STREAM,
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
-        int family = AF_UNSPEC)
+        int family = AF_UNSPEC,
+        int flags = AI_PASSIVE)
     {
         PRINTF1("Obtaining the address info...\n");
         std::string port_str(std::to_string(port));
@@ -19,6 +20,7 @@ namespace ba_socket {
         memset(&hints, 0, sizeof(hints));
         hints.ai_socktype = socktype;
         hints.ai_family = family;
+        hints.ai_flags = flags;
         struct addrinfo *socket_addr;
         if (hostname.empty()) {
             if (::getaddrinfo(nullptr, port_str.c_str(), &hints, &socket_addr)) {

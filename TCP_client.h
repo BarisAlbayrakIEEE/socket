@@ -8,11 +8,14 @@
 #ifdef _WIN32
     #include <conio.h>
 #endif
+#include <atomic>
 
 namespace ba_socket {
-    int TCP_client(const std::string& hostname = "localhost", uint16_t port = 8080, int family = AF_INET6) {
-        SOCKET_STARTUP();
-
+    int TCP_client_helper(
+        const std::string& hostname = "localhost",
+        uint16_t port = 8080,
+        int family = AF_INET6)
+    {
         // obtain the peer address
         struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
         if (!peer_addr) return 1;
@@ -55,12 +58,14 @@ namespace ba_socket {
             FD_SET(0, &reads); // on unix/linux, stdin fd = 0
 #endif
 
-            // wait for data on socket
-            // as windows doesn't support fd_set for stdin, we use a timeout loop
+            // call select to register running file descriptors to the fd_set.
+            // select needs to wait for some time,
+            // as windows doesn't support fd_set for stdin, we use a timeout loop.
             struct timeval timeout;
             timeout.tv_sec = 0;
             timeout.tv_usec = 100000;
             if (::select(fd_peer + 1, &reads, nullptr, nullptr, &timeout) < 0) {
+                if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
                 SOCKET_ERROR__SELECT();
                 return 1;
             }
@@ -92,12 +97,18 @@ namespace ba_socket {
             }
         }
 
-        // close the peer socket
-        PRINTF1("[Client]: Closing the peer socket...\n");
-        socket_peer.close();
-
-        SOCKET_CLEANUP();
         return 0;
+    }
+    
+    inline int TCP_client(
+        const std::string& hostname = "localhost",
+        uint16_t port = 8080,
+        int family = AF_INET6)
+    {
+        SOCKET_STARTUP();
+        int status = TCP_client_helper(hostname, port, family);
+        SOCKET_CLEANUP();
+        return status;
     }
 } // namespace ba_socket
 

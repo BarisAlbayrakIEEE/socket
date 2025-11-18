@@ -1,3 +1,5 @@
+// timer_server__handle_client.h
+
 #ifndef SERVER_WITH_TIMER__HANDLE_CLIENT_H
 #define SERVER_WITH_TIMER__HANDLE_CLIENT_H
 
@@ -46,7 +48,6 @@ namespace ba_socket {
             "Content-Type: text/plain\r\n"
             "Content-Length: %zu\r\n\r\n",
             strlen(body));
-
         socket_client.send(header, strlen(header), 0);
         socket_client.send(body, strlen(body), 0);
 

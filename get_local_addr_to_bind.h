@@ -38,7 +38,8 @@ namespace ba_socket {
         const std::string& bind_mode,
         uint16_t port = 8080,
         int family = AF_INET6,
-        int socktype = SOCK_STREAM)
+        int socktype = SOCK_STREAM,
+        int flags = AI_PASSIVE)
     {
         PRINTF1("Obtaining the local address to bind...\n");
 
@@ -59,10 +60,10 @@ namespace ba_socket {
         std::memset(&hints, 0, sizeof(hints));
         hints.ai_family   = family;
         hints.ai_socktype = socktype;
-        hints.ai_flags    = AI_PASSIVE;
+        hints.ai_flags    = flags;
 
         // obtain the peer address
-        struct addrinfo *bind_addr = get_addrinfo(socktype, node, port, family);
+        struct addrinfo *bind_addr = get_addrinfo(socktype, node, port, family, flags);
         return bind_addr;
     }
 } // namespace ba_socket

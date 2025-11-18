@@ -1,7 +1,9 @@
-#ifndef SERVER_WITH_TIMER__SELECT_H
-#define SERVER_WITH_TIMER__SELECT_H
+// timer_server__accept.h
 
-#include "server_with_timer__handle_client.h"
+#ifndef SERVER_WITH_TIMER__ACCEPT_H
+#define SERVER_WITH_TIMER__ACCEPT_H
+
+#include "timer_server__handle_client.h"
 #include <thread>
 #include <vector>
 #include <csignal>
@@ -12,18 +14,18 @@ namespace ba_socket {
         running = false;
     }
 
-    int server_with_timer__select(void) {
-        SOCKET_STARTUP();
+    int timer_server__accept_helper(void) {
+        // sigaction to handle Ctrl + C
+        struct sigaction sa{};
+        sa.sa_handler = signal_handler;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = 0; // disable SA_RESTART to allow Ctrl + C to interrupt accept()
+        sigaction(SIGINT, &sa, nullptr);
 
         // create the server socket and bind to the local address
         PRINTF1("Creating socket for the server and binding it to the local address...\n");
         Socket socket_listen = create_socket_bind_to_local_addr("all");
         if (!socket_listen.is_valid()) return 1;
-
-        // convert IPV6_V6ONLY socket to dual stack.
-        // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        PRINTF1("Converting IPV6_V6ONLY socket to dual stack...\n");
-        if (!socket_listen.set_sockopt()) return 1;
 
         // listen for connections
         PRINTF1("Listening for connections...(Ctrl+C to stop)\n");
@@ -32,7 +34,6 @@ namespace ba_socket {
         // Accept loop
         {
             std::vector<std::jthread> client_threads;
-            ::signal(SIGINT, signal_handler);
             while (running) {
                 // accept a connection
                 PRINTF1("Accepting a connection...\n");
@@ -40,8 +41,14 @@ namespace ba_socket {
 
                 struct sockaddr_storage client_address;
                 socklen_t client_len = sizeof(client_address);
-                Socket socket_client = socket_listen.accept((struct sockaddr*)&client_address, &client_len);
-                if (!socket_client.is_valid()) return 1;
+                Socket socket_client = socket_listen.accept(
+                    (struct sockaddr*)&client_address,
+                    &client_len);
+                if (!socket_client.is_valid()) {
+                    if (GET_SOCKET_ERRNO() == EINTR) continue;   // accept interrupted by Ctrl+C
+                    SOCKET_ERROR__ACCEPT();
+                    return 1;
+                }
 
                 // Spawn a thread per client
                 if (!running) {
@@ -64,13 +71,15 @@ namespace ba_socket {
         }
         PRINTF1("All clients finished.\n");
 
-        // close listening socket
-        PRINTF1("Closing listening socket...\n");
-        socket_listen.close();
-
-        SOCKET_CLEANUP();
         return 0;
+    }
+    
+    inline int timer_server__accept() {
+        SOCKET_STARTUP();
+        int status = timer_server__accept_helper();
+        SOCKET_CLEANUP();
+        return status;
     }
 } // namespace ba_socket
 
-#endif // SERVER_WITH_TIMER__SELECT_H
+#endif // SERVER_WITH_TIMER__ACCEPT_H
