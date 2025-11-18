@@ -60,7 +60,7 @@ namespace ba_socket {
             struct timeval timeout;
             timeout.tv_sec = 0;
             timeout.tv_usec = 100000;
-            if (::select(fd_peer + 1, &reads, 0, 0, &timeout) < 0) {
+            if (::select(fd_peer + 1, &reads, nullptr, nullptr, &timeout) < 0) {
                 SOCKET_ERROR__SELECT();
                 return 1;
             }

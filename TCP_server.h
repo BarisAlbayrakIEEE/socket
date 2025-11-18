@@ -32,7 +32,7 @@ namespace ba_socket {
         while(1) {
             fd_set reads;
             reads = master;
-            if (::select(fd_max + 1, &reads, 0, 0, 0) < 0) {
+            if (::select(fd_max + 1, &reads, nullptr, nullptr, nullptr) < 0) {
                 SOCKET_ERROR__SELECT();
                 return 1;
             }
