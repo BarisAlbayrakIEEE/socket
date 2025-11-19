@@ -1,7 +1,7 @@
-// socket_setup.h
+// socket_setup.hpp
 
-#ifndef SOCKET_SETUP_H
-#define SOCKET_SETUP_H
+#ifndef SOCKET_SETUP_HPP
+#define SOCKET_SETUP_HPP
 
 #include <stdexcept>
 
@@ -146,4 +146,4 @@
         throw std::runtime_error(std::string("[select() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
 #endif
 
-#endif // SOCKET_SETUP_H
+#endif // SOCKET_SETUP_HPP

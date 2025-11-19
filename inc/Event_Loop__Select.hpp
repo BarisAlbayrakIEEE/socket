@@ -1,7 +1,7 @@
-// Event_Loop__Select.h
+// Event_Loop__Select.hpp
 
-#ifndef EVENT_LOOP__SELECT_H
-#define EVENT_LOOP__SELECT_H
+#ifndef EVENT_LOOP__SELECT_HPP
+#define EVENT_LOOP__SELECT_HPP
 
 #include "IEvent_Loop.hpp"
 #include <sys/select.h>
@@ -10,7 +10,7 @@
 #include <atomic>
 #include <unordered_map>
 
-namespace ba_socket {
+namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
     public:
         using Callback = std::function<void(const Socket&)>;
@@ -29,7 +29,7 @@ namespace ba_socket {
 
         void register_fd(const Socket& s, EventType type) override {
             std::lock_guard lock(_mtx);
-            int fd = s.fd();
+            int fd = s.native_handle();
 
             if (type == EventType::Read)
                 _read_map[fd] = s;
@@ -41,7 +41,7 @@ namespace ba_socket {
 
         void unregister_fd(const Socket& s) override {
             std::lock_guard lock(_mtx);
-            int fd = s.fd();
+            int fd = s.native_handle();
             _read_map.erase(fd);
             _write_map.erase(fd);
             update_fd_sets();
@@ -101,11 +101,11 @@ namespace ba_socket {
 
         int _max_fd = 0;
 
-        std::unordered_map<int, Socket> _read_map;
-        std::unordered_map<int, Socket> _write_map;
+        std::unordered_map<SOCKET, Socket> _read_map;
+        std::unordered_map<SOCKET, Socket> _write_map;
 
         Callback _on_read, _on_write, _on_disconnect;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // EVENT_LOOP__SELECT_H
+#endif // EVENT_LOOP__SELECT_HPP

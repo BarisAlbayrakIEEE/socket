@@ -1,7 +1,7 @@
-// Socket.h
+// Socket.hpp
 
-#ifndef SOCKET_H
-#define SOCKET_H
+#ifndef SOCKET_HPP
+#define SOCKET_HPP
 
 #include "utility_addr.hpp"
 #include <stdexcept>
@@ -9,7 +9,7 @@
 #include <cstring>
 #include <stdio.h>
 
-namespace ba_socket {
+namespace BA_Socket {
     class Socket {
     public:
         explicit Socket(SOCKET fd) noexcept : _fd(fd) {};
@@ -175,7 +175,7 @@ namespace ba_socket {
             }
         }
 
-        // Check if socket is valid
+        // check if socket is valid
         inline bool is_valid() const noexcept {
             return IS_VALID_SOCKET(_fd);
         }
@@ -260,6 +260,6 @@ namespace ba_socket {
 
         return socket_;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // SOCKET_H
+#endif // SOCKET_HPP

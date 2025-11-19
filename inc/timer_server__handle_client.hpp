@@ -1,16 +1,16 @@
-// timer_server__handle_client.h
+// timer_server_handle_client.hpp
 
-#ifndef SERVER_WITH_TIMER__HANDLE_CLIENT_H
-#define SERVER_WITH_TIMER__HANDLE_CLIENT_H
+#ifndef SERVER_WITH_TIMER__HANDLE_CLIENT_HPP
+#define SERVER_WITH_TIMER__HANDLE_CLIENT_HPP
 
-#include "Socket.h"
-#include "utility_addr.h"
+#include "Socket.hpp"
+#include "utility_addr.hpp"
 #include <atomic>
 #include <time.h>
 
-namespace ba_socket {
+namespace BA_Socket {
 
-    // Worker thread: handles a single client connection
+    // Worker thread handles a single client connection
     std::atomic<int> active_clients{0};
     void handle_client(
         SOCKET fd_client,
@@ -60,6 +60,6 @@ namespace ba_socket {
 
         --active_clients;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // SERVER_WITH_TIMER__HANDLE_CLIENT_H
+#endif // SERVER_WITH_TIMER__HANDLE_CLIENT_HPP

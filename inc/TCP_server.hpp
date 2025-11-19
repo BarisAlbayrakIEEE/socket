@@ -1,14 +1,14 @@
-// TCP_server.h
+// TCP_server.hpp
 
-#ifndef TCP_SERVER_H
-#define TCP_SERVER_H
+#ifndef TCP_SERVER_HPP
+#define TCP_SERVER_HPP
 
-#include "Socket.h"
-#include "utility_addr.h"
+#include "Socket.hpp"
+#include "utility_addr.hpp"
 #include <atomic>
 #include <ctype.h>
 
-namespace ba_socket {
+namespace BA_Socket {
     int TCP_server_helper() {
         // create the server socket and bind to the local address
         PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
@@ -101,6 +101,6 @@ namespace ba_socket {
         SOCKET_CLEANUP();
         return status;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // TCP_SERVER_H
+#endif // TCP_SERVER_HPP

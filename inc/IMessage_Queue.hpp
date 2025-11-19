@@ -1,9 +1,9 @@
-// IMessage_Queue.h
+// IMessage_Queue.hpp
 
-#ifndef IMESSAGE_QUEUE_H
-#define IMESSAGE_QUEUE_H
+#ifndef IMESSAGE_QUEUE_HPP
+#define IMESSAGE_QUEUE_HPP
 
-namespace ba_socket {
+namespace BA_Socket {
     template <typename T>
     class IMessage_Queue {
     public:
@@ -12,6 +12,6 @@ namespace ba_socket {
         virtual void push(const T&) = 0;
         virtual bool try_pop(T&) = 0;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // IMESSAGE_QUEUE_H
+#endif // IMESSAGE_QUEUE_HPP

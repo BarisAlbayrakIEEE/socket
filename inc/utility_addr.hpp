@@ -1,7 +1,7 @@
-// utility_addr.h
+// utility_addr.hpp
 
-#ifndef UTILITY_ADDR_H
-#define UTILITY_ADDR_H
+#ifndef UTILITY_ADDR_HPP
+#define UTILITY_ADDR_HPP
 
 #include "socket_setup.hpp"
 #include <cstring>
@@ -15,7 +15,7 @@
 #include <cstring>
 #include <string>
 
-namespace ba_socket {
+namespace BA_Socket {
     inline struct addrinfo* get_addrinfo(
         int socktype = SOCK_STREAM,
         const std::string& hostname = "localhost",
@@ -231,7 +231,7 @@ namespace ba_socket {
             if (family == AF_INET6) node = "::1";
         }
         else {
-            node = get_ip_of_interface(bind_mode); // e.g. "eth0"
+            node = get_ip_of_interface(bind_mode); // e.g. "ech0"
             if (node.empty()) return nullptr;
         }
 
@@ -245,6 +245,6 @@ namespace ba_socket {
         struct addrinfo *bind_addr = get_addrinfo(socktype, node, port, family, flags);
         return bind_addr;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // UTILITY_ADDR_H
+#endif // UTILITY_ADDR_HPP

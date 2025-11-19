@@ -1,7 +1,7 @@
-// Worker_Pool__Concurrent_Queue_Blocking.h
+// Worker_Pool__Concurrent_Queue_Blocking.hpp
 
-#ifndef WORKER_POOL__BLOCKING_QUEUE_H
-#define WORKER_POOL__BLOCKING_QUEUE_H
+#ifndef WORKER_POOL__BLOCKING_QUEUE_HPP
+#define WORKER_POOL__BLOCKING_QUEUE_HPP
 
 #include "IWorker_Pool.hpp"
 #include "Concurrent_Queue_Blocking.hpp"
@@ -10,7 +10,7 @@
 
 using namespace BA_Concurrency;
 
-namespace ba_socket {
+namespace BA_Socket {
     class Worker_Pool__Concurrent_Queue_Blocking : public IWorker_Pool {
     public:
         explicit Worker_Pool__Concurrent_Queue_Blocking(
@@ -39,9 +39,9 @@ namespace ba_socket {
 
     private:
         std::atomic<bool> _running{true};
-        Blocking_Queue<std::function<void()>> _queue;
+        Concurrent_Queue_Blocking<std::function<void()>> _queue;
         std::vector<std::thread> _workers;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // WORKER_POOL__BLOCKING_QUEUE_H
+#endif // WORKER_POOL__BLOCKING_QUEUE_HPP

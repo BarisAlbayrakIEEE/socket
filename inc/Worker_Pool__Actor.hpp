@@ -1,15 +1,17 @@
 // Worker_Pool__Actor.h
 
-#ifndef WORKER_POOL__ACTOR_H
-#define WORKER_POOL__ACTOR_H
+#ifndef WORKER_POOL__ACTOR_HPP
+#define WORKER_POOL__ACTOR_HPP
 
-#include "IWorker_Pool.h"
-#include "Concurrent_Queue.h"   // MPSC-specialized
+#include "IWorker_Pool.hpp"
+#include "Concurrent_Queue_LF_Ring_MPMC.hpp"
 #include <vector>
 #include <thread>
 #include <atomic>
 
-namespace ba_socket {
+using namespace BA_Concurrency;
+
+namespace BA_Socket {
     class Worker_Pool__Actor : public IWorker_Pool {
     public:
         Worker_Pool__Actor(size_t threads = std::thread::hardware_concurrency())
@@ -44,9 +46,9 @@ namespace ba_socket {
     private:
         std::atomic<bool> _running{true};
         std::atomic<size_t> _next{0};
-        std::vector<Concurrent_Queue<std::function<void()>>> _queues;
+        std::vector<queue_LF_ring_MPMC<std::function<void()>, 8>> _queues;
         std::vector<std::thread> _workers;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // WORKER_POOL__ACTOR_H
+#endif // WORKER_POOL__ACTOR_HPP

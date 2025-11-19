@@ -1,16 +1,16 @@
-// Server_Strategy__Single_Thread_Reactor.h
+// Server_Strategy__Single_thread_Reactor.hpp
 
-#ifndef SERVER_STRATEGY__SINGLE_THREAD_REACTOR_H
-#define SERVER_STRATEGY__SINGLE_THREAD_REACTOR_H
+#ifndef SERVER_STRATEGY__SINGLE_THREAD_REACTOR_HPP
+#define SERVER_STRATEGY__SINGLE_THREAD_REACTOR_HPP
 
 #include "IServer_Strategy.hpp"
 #include "IEvent_Loop.hpp"
 #include "IWorker_Pool.hpp"
 
-namespace ba_socket {
-    class Server_Strategy__Single_Thread_Reactor : public IServer_Strategy {
+namespace BA_Socket {
+    class Server_Strategy__Single_thread_Reactor : public IServer_Strategy {
     public:
-        Server_Strategy__Single_Thread_Reactor(IEvent_Loop& loop, IWorker_Pool& pool)
+        Server_Strategy__Single_thread_Reactor(IEvent_Loop& loop, IWorker_Pool& pool)
             : _loop(loop), _pool(pool)
         {}
 
@@ -18,7 +18,7 @@ namespace ba_socket {
         void stop()  override { _loop.stop();  _pool.shutdown(); }
 
         void on_accept(Socket client) override {
-            // Accept happens on the I/O thread
+            // Accepthappens on the I/O thread
             _pool.submit([this, client]() mutable {
                 // parse / compute work
             });
@@ -33,7 +33,7 @@ namespace ba_socket {
         }
 
         void on_write_ready(Socket client) override {
-            client.flush_pending_writes();
+            client.fluh_pending_writes();
         }
 
         void on_disconnect(Socket client) override {
@@ -44,6 +44,6 @@ namespace ba_socket {
         IEvent_Loop& _loop;
         IWorker_Pool& _pool;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // SERVER_STRATEGY__SINGLE_THREAD_REACTOR_H
+#endif // SERVER_STRATEGY__SINGLE_THREAD_REACTOR_HPP

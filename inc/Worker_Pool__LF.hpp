@@ -1,15 +1,17 @@
-// Worker_Pool__LF.h
+// Worker_Pool__LFh
 
-#ifndef WORKER_POOL__LF_H
-#define WORKER_POOL__LF_H
+#ifndef WORKER_POOL__LF_HPP
+#define WORKER_POOL__LF_HPP
 
-#include "IWorker_Pool.h"
-#include "Concurrent_Queue.h"
+#include "IWorker_Pool.hpp"
+#include "Concurrent_Queue_LF_Ring_MPMC.hpp"
 #include <vector>
 #include <thread>
 #include <atomic>
 
-namespace ba_socket {
+using namespace BA_Concurrency;
+
+namespace BA_Socket {
     class Worker_Pool__LF : public IWorker_Pool {
     public:
         Worker_Pool__LF(size_t threads = std::thread::hardware_concurrency())
@@ -39,9 +41,9 @@ namespace ba_socket {
 
     private:
         std::atomic<bool> _running{true};
-        Concurrent_Queue<std::function<void()>> _queue;
+        queue_LF_ring_MPMC<std::function<void()>, 8> _queue;
         std::vector<std::thread> _workers;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // WORKER_POOL__LF_H
+#endif // WORKER_POOL__LF_HPP

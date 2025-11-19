@@ -1,12 +1,12 @@
-// IServer_Strategy.h
+// IServer_Strategy.hpp
 
-#ifndef ISERVER_STRATEGY_H
-#define ISERVER_STRATEGY_H
+#ifndef ISERVER_STRATEGY_HPP
+#define ISERVER_STRATEGY_HPP
 
 #include <functional>
 #include "Socket.hpp"
 
-namespace ba_socket {
+namespace BA_Socket {
     class IServer_Strategy {
     public:
         virtual ~IServer_Strategy() = default;
@@ -20,6 +20,6 @@ namespace ba_socket {
         virtual void on_write_ready(Socket client) = 0;
         virtual void on_disconnect(Socket client) = 0;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // ISERVER_STRATEGY_H
+#endif // ISERVER_STRATEGY_HPP

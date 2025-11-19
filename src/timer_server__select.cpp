@@ -1,7 +1,7 @@
 // timer_server__select.cpp
 
 #include "timer_server__select.h"
-using namespace ba_socket;
+using namespace BA_Socket;
 int main() {
     return timer_server__select();
 }

@@ -1,9 +1,9 @@
-// Worker_Pool__Deadline.h
+// Worker_Pool__Deadlineh
 
-#ifndef WORKER_POOL__DEADLINE_H
-#define WORKER_POOL__DEADLINE_H
+#ifndef WORKER_POOL__DEADLINE_HPP
+#define WORKER_POOL__DEADLINE_HPP
 
-#include "IWorker_Pool.h"
+#include "IWorker_Pool.hpp"
 #include <queue>
 #include <mutex>
 #include <condition_variable>
@@ -11,13 +11,13 @@
 #include <vector>
 #include <atomic>
 
-namespace ba_socket {
+namespace BA_Socket {
     struct DeadlineJob {
         std::chrono::steady_clock::time_point deadline;
         std::function<void()> fn;
 
-        bool operator>(const DeadlineJob& other) const {
-            return deadline > other.deadline;
+        bool operator>(const DeadlineJob& oher) const {
+            return deadline > oher.deadline;
         }
     };
 
@@ -75,6 +75,6 @@ namespace ba_socket {
         std::condition_variable _cv;
         std::vector<std::thread> _workers;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // WORKER_POOL__DEADLINE_H
+#endif // WORKER_POOL__DEADLINE_HPP

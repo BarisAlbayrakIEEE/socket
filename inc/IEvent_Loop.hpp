@@ -1,13 +1,13 @@
 // IEvent_Loop.hpp
 
-#ifndef IEVENT_LOOP_H
-#define IEVENT_LOOP_H
+#ifndef IEVENT_LOOP_HPP
+#define IEVENT_LOOP_HPP
 
 #include <functional>
 #include <unordered_map>
 #include "Socket.hpp"
 
-namespace ba_socket {
+namespace BA_Socket {
     enum class EventType { Read, Write };
 
     class IEvent_Loop {
@@ -20,6 +20,6 @@ namespace ba_socket {
         virtual void run() = 0;      // blocking
         virtual void stop() = 0;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // IEVENT_LOOP_H
+#endif // IEVENT_LOOP_HPP

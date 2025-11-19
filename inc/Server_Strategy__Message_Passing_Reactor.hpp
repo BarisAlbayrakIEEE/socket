@@ -1,14 +1,16 @@
-// Server_Strategy__Message_Passing_Reactor.h
+// Server_Strategy__Message_Passing_Reactor.hpp
 
-#ifndef SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_H
-#define SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_H
+#ifndef SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_HPP
+#define SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_HPP
 
 #include "IServer_Strategy.hpp"
 #include "IEvent_Loop.hpp"
 #include "IWorker_Pool.hpp"
 #include "IMessage_Queue.hpp"
+#include <stop_token>
+#include <thread>
 
-namespace ba_socket {
+namespace BA_Socket {
     struct WorkerJob {
         Socket client;
         std::vector<uint8_t> data;
@@ -51,7 +53,7 @@ namespace ba_socket {
         }
 
         void on_accept(Socket client) override {
-            // nothing special here
+            // nohing specialhere
         }
 
         void on_read_ready(Socket client) override {
@@ -76,6 +78,6 @@ namespace ba_socket {
 
         std::jthread _worker_poller;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_H
+#endif // SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_HPP

@@ -1,7 +1,7 @@
-// Server_Strategy__Leader_Follower.h
+// Server_Strategy__Leader_Follower.hpp
 
-#ifndef SERVER_STRATEGY__LEADER_FOLLOWER_H
-#define SERVER_STRATEGY__LEADER_FOLLOWER_H
+#ifndef SERVER_STRATEGY__LEADER_FOLLOWER_HPP
+#define SERVER_STRATEGY__LEADER_FOLLOWER_HPP
 
 #include "IServer_Strategy.hpp"
 #include "IEvent_Loop.hpp"
@@ -11,7 +11,7 @@
 #include <queue>
 #include <atomic>
 
-namespace ba_socket {
+namespace BA_Socket {
     class Server_Strategy__Leader_Follower : public IServer_Strategy {
     public:
         Server_Strategy__Leader_Follower(IEvent_Loop& loop, IWorker_Pool& pool)
@@ -31,31 +31,31 @@ namespace ba_socket {
 
         // Called by leader thread (event loop)
         void on_accept(Socket client) override {
-            dispatch([client, this]() mutable {
-                // handle accept
+            dispath([client, this]() mutable {
+                //handle accept
             });
         }
 
         void on_read_ready(Socket client) override {
-            dispatch([client, this]() mutable {
-                // handle read
+            dispath([client, this]() mutable {
+                //handle read
             });
         }
 
         void on_write_ready(Socket client) override {
-            dispatch([client, this]() mutable {
-                // handle write
+            dispath([client, this]() mutable {
+                //handle write
             });
         }
 
         void on_disconnect(Socket client) override {
-            dispatch([client, this]() mutable {
-                // handle disconnect
+            dispath([client, this]() mutable {
+                //handle disconnect
             });
         }
 
     private:
-        void dispatch(std::function<void()> job) {
+        void dispath(std::function<void()> job) {
             _pool.submit([this, job]() {
                 job();
                 become_leader();
@@ -83,6 +83,6 @@ namespace ba_socket {
         std::atomic<bool> _running;
         bool _is_leader = false;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // SERVER_STRATEGY__LEADER_FOLLOWER_H
+#endif // SERVER_STRATEGY__LEADER_FOLLOWER_HPP

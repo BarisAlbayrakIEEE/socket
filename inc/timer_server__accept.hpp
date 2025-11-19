@@ -1,14 +1,14 @@
-// timer_server__accept.h
+// timer_server__accept.hpp
 
-#ifndef SERVER_WITH_TIMER__ACCEPT_H
-#define SERVER_WITH_TIMER__ACCEPT_H
+#ifndef SERVER_WITH_TIMER__ACCEPT_HPP
+#define SERVER_WITH_TIMER__ACCEPT_HPP
 
-#include "timer_server__handle_client.h"
+#include "timer_server__handle_client.hpp"
 #include <thread>
 #include <vector>
 #include <csignal>
 
-namespace ba_socket {
+namespace BA_Socket {
     std::atomic<bool> running{true};
     void signal_handler(int) {
         running = false;
@@ -82,6 +82,6 @@ namespace ba_socket {
         SOCKET_CLEANUP();
         return status;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // SERVER_WITH_TIMER__ACCEPT_H
+#endif // SERVER_WITH_TIMER__ACCEPT_HPP

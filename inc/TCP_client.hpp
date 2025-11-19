@@ -1,16 +1,16 @@
-// TCP_client.h
+// TCP_client.hpp
 
-#ifndef TCP_CLIENT_H
-#define TCP_CLIENT_H
+#ifndef TCP_CLIENT_HPP
+#define TCP_CLIENT_HPP
 
-#include "Socket.h"
-#include "utility_addr.h"
+#include "Socket.hpp"
+#include "utility_addr.hpp"
 #ifdef _WIN32
     #include <conio.h>
 #endif
 #include <atomic>
 
-namespace ba_socket {
+namespace BA_Socket {
     int TCP_client_helper(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
@@ -110,6 +110,6 @@ namespace ba_socket {
         SOCKET_CLEANUP();
         return status;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // TCP_CLIENT_H
+#endif // TCP_CLIENT_HPP

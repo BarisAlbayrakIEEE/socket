@@ -1,6 +1,6 @@
 find_package(GTest REQUIRED)
 
-file(GLOB HEADER_TEST *.h)
+file(GLOB HEADER_TEST *h)
 file(GLOB SORCE_TEST *.cpp)
 
 add_executable(

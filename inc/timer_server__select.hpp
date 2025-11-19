@@ -1,14 +1,14 @@
-// timer_server__select.h
+// timer_server__select.hpp
 
-#ifndef SERVER_WITH_TIMER__SELECT_H
-#define SERVER_WITH_TIMER__SELECT_H
+#ifndef SERVER_WITH_TIMER__SELECT_HPP
+#define SERVER_WITH_TIMER__SELECT_HPP
 
-#include "timer_server__handle_client.h"
+#include "timer_server__handle_client.hpp"
 #include <thread>
 #include <vector>
 #include <csignal>
 
-namespace ba_socket {
+namespace BA_Socket {
     int timer_server__select_helper(void) {
         // create the server socket and bind to the local address
         PRINTF1("Creating socket for the server and binding it to the local address...\n");
@@ -65,7 +65,7 @@ namespace ba_socket {
                         }
                         print_sockaddr<is_debug_mode>(client_addr, client_len);
 
-                        // Spawn handler thread
+                        // Spawnhandler thread
                         client_threads.emplace_back(
                             handle_client,
                             fd_client,
@@ -94,6 +94,6 @@ namespace ba_socket {
         SOCKET_CLEANUP();
         return status;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // SERVER_WITH_TIMER__SELECT_H
+#endif // SERVER_WITH_TIMER__SELECT_HPP

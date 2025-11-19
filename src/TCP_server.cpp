@@ -1,7 +1,7 @@
 // TCP_server.cpp
 
-#include "TCP_server.h"
-using namespace ba_socket;
+#include "TCP_serverh"
+using namespace BA_Socket;
 
 int main() {
     int status = TCP_server();

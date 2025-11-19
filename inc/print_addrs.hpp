@@ -1,9 +1,11 @@
-#ifndef PRINT_ADDRS_H
-#define PRINT_ADDRS_H
+// print_addrs.hpp
 
-#include "utility_addr.h"
+#ifndef PRINT_ADDRS_HPP
+#define PRINT_ADDRS_HPP
 
-namespace ba_socket {
+#include "utility_addr.hpp"
+
+namespace BA_Socket {
     int print_addrs(void) {
         SOCKET_STARTUP();
 
@@ -33,6 +35,6 @@ namespace ba_socket {
         SOCKET_CLEANUP();
         return 0;
     }
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // PRINT_ADDRS_H
+#endif // PRINT_ADDRS_HPP

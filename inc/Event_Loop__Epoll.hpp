@@ -1,7 +1,7 @@
-// Event_Loop__Epoll.h
+// Event_Loop__Epoll.hpp
 
-#ifndef EVENT_LOOP__EPOLL_H
-#define EVENT_LOOP__EPOLL_H
+#ifndef EVENT_LOOP__EPOLL_HPP
+#define EVENT_LOOP__EPOLL_HPP
 
 #include "IEvent_Loop.hpp"
 #include <sys/epoll.h>
@@ -10,7 +10,7 @@
 #include <atomic>
 #include <unordered_map>
 
-namespace ba_socket {
+namespace BA_Socket {
     class Event_Loop__Epoll : public IEvent_Loop {
     public:
         using Callback = std::function<void(const Socket&)>;
@@ -35,7 +35,7 @@ namespace ba_socket {
         void register_fd(const Socket& s, EventType type) override {
             std::lock_guard lock(_mtx);
 
-            int fd = s.fd();
+            int fd = s.native_handle();
             epoll_event ev{};
             ev.data.fd = fd;
             ev.events = (type == EventType::Read ? EPOLLIN : EPOLLOUT);
@@ -48,7 +48,7 @@ namespace ba_socket {
 
         void unregister_fd(const Socket& s) override {
             std::lock_guard lock(_mtx);
-            int fd = s.fd();
+            int fd = s.native_handle();
 
             ::epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, nullptr);
             _socket_map.erase(fd);
@@ -86,10 +86,10 @@ namespace ba_socket {
         std::mutex _mtx;
         std::atomic<bool> _running{false};
 
-        std::unordered_map<int, Socket> _socket_map;
+        std::unordered_map<SOCKET, Socket> _socket_map;
 
         Callback _on_read, _on_write, _on_disconnect;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // EVENT_LOOP__EPOLL_H
+#endif // EVENT_LOOP__EPOLL_HPP

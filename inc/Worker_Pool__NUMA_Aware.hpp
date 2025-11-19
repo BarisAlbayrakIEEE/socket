@@ -1,17 +1,19 @@
-// Worker_Pool__NUMA_Aware.h
+// Worker_Pool__NUMA_Awareh
 
-#ifndef WORKER_POOL__NUMA_AWARE_H
-#define WORKER_POOL__NUMA_AWARE_H
+#ifndef WORKER_POOL__NUMA_AWARE_HPP
+#define WORKER_POOL__NUMA_AWARE_HPP
 
-#include "IWorker_Pool.h"
-#include "Concurrent_Queue_Blocking.h"
+#include "IWorker_Pool.hpp"
+#include "Concurrent_Queue_Blocking.hpp"
 #include <thread>
 #include <vector>
 #include <atomic>
 #include <sched.h>
 #include <unistd.h>
 
-namespace ba_socket {
+using namespace BA_Concurrency;
+
+namespace BA_Socket {
     class Worker_Pool__NUMA_Aware : public IWorker_Pool {
     public:
         Worker_Pool__NUMA_Aware(size_t threads_per_node = 2)
@@ -61,6 +63,6 @@ namespace ba_socket {
         std::vector<Concurrent_Queue_Blocking<std::function<void()>>> _queues;
         std::vector<std::thread> _workers;
     };
-} // namespace ba_socket
+} // namespace BA_Socket
 
-#endif // WORKER_POOL__NUMA_AWARE_H
+#endif // WORKER_POOL__NUMA_AWARE_HPP
