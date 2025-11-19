@@ -3,7 +3,7 @@
 #ifndef UTILITY_ADDR_H
 #define UTILITY_ADDR_H
 
-#include "socket_setup.h"
+#include "socket_setup.hpp"
 #include <cstring>
 #ifdef _WIN32
     #include <iphlpapi.h>

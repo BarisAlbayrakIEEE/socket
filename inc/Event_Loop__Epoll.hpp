@@ -3,7 +3,7 @@
 #ifndef EVENT_LOOP__EPOLL_H
 #define EVENT_LOOP__EPOLL_H
 
-#include "IEventLoop.h"
+#include "IEvent_Loop.hpp"
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <mutex>
@@ -11,7 +11,7 @@
 #include <unordered_map>
 
 namespace ba_socket {
-    class Event_Loop__Epoll : public IEventLoop {
+    class Event_Loop__Epoll : public IEvent_Loop {
     public:
         using Callback = std::function<void(const Socket&)>;
 

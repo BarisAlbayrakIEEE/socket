@@ -1,12 +1,12 @@
-// Message_Passing_Reactor_Strategy.h
+// Server_Strategy__Message_Passing_Reactor.h
 
-#ifndef MESSAGE_PASSING_REACTOR_STRATEGY_H
-#define MESSAGE_PASSING_REACTOR_STRATEGY_H
+#ifndef SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_H
+#define SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_H
 
-#include "IServerStrategy.h"
-#include "IEventLoop.h"
-#include "IWorkerPool.h"
-#include "IMessageQueue.h"
+#include "IServer_Strategy.hpp"
+#include "IEvent_Loop.hpp"
+#include "IWorker_Pool.hpp"
+#include "IMessage_Queue.hpp"
 
 namespace ba_socket {
     struct WorkerJob {
@@ -19,13 +19,13 @@ namespace ba_socket {
         std::vector<uint8_t> response;
     };
 
-    class Message_Passing_Reactor_Strategy : public IServerStrategy {
+    class Server_Strategy__Message_Passing_Reactor : public IServer_Strategy {
     public:
-        Message_Passing_Reactor_Strategy(
-            IEventLoop& loop,
-            IWorkerPool& pool,
-            IMessageQueue<WorkerJob>& toWorkers,
-            IMessageQueue<IoJob>& toIo)
+        Server_Strategy__Message_Passing_Reactor(
+            IEvent_Loop& loop,
+            IWorker_Pool& pool,
+            IMessage_Queue<WorkerJob>& toWorkers,
+            IMessage_Queue<IoJob>& toIo)
             : _loop(loop), _pool(pool),
             _toWorkers(toWorkers), _toIo(toIo)
         {}
@@ -68,14 +68,14 @@ namespace ba_socket {
         }
 
     private:
-        IEventLoop& _loop;
-        IWorkerPool& _pool;
+        IEvent_Loop& _loop;
+        IWorker_Pool& _pool;
 
-        IMessageQueue<WorkerJob>& _toWorkers;
-        IMessageQueue<IoJob>& _toIo;
+        IMessage_Queue<WorkerJob>& _toWorkers;
+        IMessage_Queue<IoJob>& _toIo;
 
         std::jthread _worker_poller;
     };
 } // namespace ba_socket
 
-#endif // MESSAGE_PASSING_REACTOR_STRATEGY_H
+#endif // SERVER_STRATEGY__MESSAGE_PASSING_REACTOR_H

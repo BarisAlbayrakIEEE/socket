@@ -1,18 +1,18 @@
-// IEventLoop.h
+// IEvent_Loop.hpp
 
 #ifndef IEVENT_LOOP_H
 #define IEVENT_LOOP_H
 
 #include <functional>
 #include <unordered_map>
-#include "Socket.h"
+#include "Socket.hpp"
 
 namespace ba_socket {
     enum class EventType { Read, Write };
 
-    class IEventLoop {
+    class IEvent_Loop {
     public:
-        virtual ~IEventLoop() = default;
+        virtual ~IEvent_Loop() = default;
 
         virtual void register_fd(const Socket& s, EventType type) = 0;
         virtual void unregister_fd(const Socket& s) = 0;

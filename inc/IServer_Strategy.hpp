@@ -1,15 +1,15 @@
-// IServerStrategy.h
+// IServer_Strategy.h
 
 #ifndef ISERVER_STRATEGY_H
 #define ISERVER_STRATEGY_H
 
 #include <functional>
-#include "Socket.h"
+#include "Socket.hpp"
 
 namespace ba_socket {
-    class IServerStrategy {
+    class IServer_Strategy {
     public:
-        virtual ~IServerStrategy() = default;
+        virtual ~IServer_Strategy() = default;
 
         virtual void start() = 0;
         virtual void stop() = 0;

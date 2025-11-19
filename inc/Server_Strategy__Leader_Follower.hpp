@@ -1,20 +1,20 @@
-// Leader_Follower_Strategy.h
+// Server_Strategy__Leader_Follower.h
 
-#ifndef LEADER_FOLLOWER_STRATEGY_H
-#define LEADER_FOLLOWER_STRATEGY_H
+#ifndef SERVER_STRATEGY__LEADER_FOLLOWER_H
+#define SERVER_STRATEGY__LEADER_FOLLOWER_H
 
-#include "IServerStrategy.h"
-#include "IEventLoop.h"
-#include "IWorkerPool.h"
+#include "IServer_Strategy.hpp"
+#include "IEvent_Loop.hpp"
+#include "IWorker_Pool.hpp"
 #include <mutex>
 #include <condition_variable>
 #include <queue>
 #include <atomic>
 
 namespace ba_socket {
-    class Leader_Follower_Strategy : public IServerStrategy {
+    class Server_Strategy__Leader_Follower : public IServer_Strategy {
     public:
-        Leader_Follower_Strategy(IEventLoop& loop, IWorkerPool& pool)
+        Server_Strategy__Leader_Follower(IEvent_Loop& loop, IWorker_Pool& pool)
             : _loop(loop), _pool(pool), _running(false)
         {}
 
@@ -76,8 +76,8 @@ namespace ba_socket {
             _is_leader = false;
         }
 
-        IEventLoop& _loop;
-        IWorkerPool& _pool;
+        IEvent_Loop& _loop;
+        IWorker_Pool& _pool;
 
         std::mutex _leader_mtx;
         std::atomic<bool> _running;
@@ -85,4 +85,4 @@ namespace ba_socket {
     };
 } // namespace ba_socket
 
-#endif // LEADER_FOLLOWER_STRATEGY_H
+#endif // SERVER_STRATEGY__LEADER_FOLLOWER_H
