@@ -11,71 +11,69 @@
 #include <thread>
 
 namespace BA_Socket {
-    struct WorkerJob {
-        Socket client;
-        std::vector<uint8_t> data;
-    };
-
-    struct IoJob {
-        Socket client;
-        std::vector<uint8_t> response;
-    };
 
     class Server_Strategy__Message_Passing_Reactor : public IServer_Strategy {
+
+        struct WorkerJob {
+            Socket client{ INVALID_SOCKET };
+            std::vector<uint8_t> data{};
+            WorkerJob() = default;
+        };
+        struct IoJob {
+            Socket client{ INVALID_SOCKET };
+            std::vector<uint8_t> response{};
+            IoJob() = default;
+        };
+
     public:
         Server_Strategy__Message_Passing_Reactor(
             IEvent_Loop& loop,
             IWorker_Pool& pool,
-            IMessage_Queue<WorkerJob>& toWorkers,
-            IMessage_Queue<IoJob>& toIo)
-            : _loop(loop), _pool(pool),
-            _toWorkers(toWorkers), _toIo(toIo)
-        {}
+            IMessage_Queue<WorkerJob>& to_workers,
+            IMessage_Queue<IoJob>& to_Io)
+            : _loop(loop), _pool(pool), _to_workers(to_workers), _to_Io(to_Io) {}
 
         void start() override {
             // Start worker poller thread
             _worker_poller = std::jthread([this](std::stop_token st) {
                 IoJob job;
                 while (!st.stop_requested()) {
-                    if (_toIo.try_pop(job)) {
+                    if (_to_Io.try_pop(job)) {
                         job.client.write(job.response);
                     }
                 }
             });
-
             _loop.run();
         }
 
-        void stop() override {
+        inline void stop() override {
             _loop.stop();
             _pool.shutdown();
             _worker_poller.request_stop();
         }
 
-        void on_accept(Socket client) override {
+        inline void on_accept(Socket client) override {
             // nohing specialhere
         }
 
-        void on_read_ready(Socket client) override {
+        inline void on_read_ready(Socket client) override {
             auto data = client.read_nonblocking();
-            _toWorkers.push({client, data});
+            _to_workers.push({client, data});
         }
 
-        void on_write_ready(Socket client) override {
+        inline void on_write_ready(Socket client) override {
             client.flush_pending_writes();
         }
 
-        void on_disconnect(Socket client) override {
-            // cleanup
+        inline void on_disconnect(Socket client) override {
+            TODO: cleanup;
         }
 
     private:
         IEvent_Loop& _loop;
         IWorker_Pool& _pool;
-
-        IMessage_Queue<WorkerJob>& _toWorkers;
-        IMessage_Queue<IoJob>& _toIo;
-
+        IMessage_Queue<WorkerJob>& _to_workers;
+        IMessage_Queue<IoJob>& _to_Io;
         std::jthread _worker_poller;
     };
 } // namespace BA_Socket

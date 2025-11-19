@@ -33,13 +33,13 @@ namespace BA_Socket {
             }
         }
 
-        void submit(std::function<void()> job) override {
+        inline void submit(std::function<void()> job) override {
             // Simple round-robin dispatching
             size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _queues.size();
             _queues[idx].push(std::move(job));
         }
 
-        void shutdown() override {
+        inline void shutdown() override {
             _running.store(false);
             for (auto& t : _workers) t.join();
         }

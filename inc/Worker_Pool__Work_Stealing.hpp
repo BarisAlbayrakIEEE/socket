@@ -13,8 +13,13 @@
 
 namespace BA_Socket {
     class Worker_Pool__Work_Stealing : public IWorker_Pool {
+        struct Queue {
+            std::deque<std::function<void()>> dq;
+            std::mutex mtx;
+        };
     public:
-        Worker_Pool__Work_Stealing(size_t thread_count = std::thread::hardware_concurrency())
+        Worker_Pool__Work_Stealing(
+            size_t thread_count = std::thread::hardware_concurrency())
             : _queues(thread_count)
         {
             for (size_t i = 0; i < thread_count; ++i) {
@@ -22,7 +27,7 @@ namespace BA_Socket {
             }
         }
 
-        void submit(std::function<void()> job) override {
+        inline void submit(std::function<void()> job) override {
             size_t idx = _next++ % _queues.size();
             {
                 std::lock_guard lock(_queues[idx].mtx);
@@ -30,17 +35,11 @@ namespace BA_Socket {
             }
         }
 
-        void shutdown() override {
+        inline void shutdown() override {
             _running = false;
             for (auto& t : _workers) t.join();
         }
-
     private:
-        struct Queue {
-            std::deque<std::function<void()>> dq;
-            std::mutex mtx;
-        };
-
         std::optional<std::function<void()>> steal(size_t hief) {
             size_t n = _queues.size();
             for (size_t i = 0; i < n; ++i) {
@@ -59,10 +58,8 @@ namespace BA_Socket {
 
         void worker_loop(size_t id) {
             auto& q = _queues[id];
-
             while (_running) {
                 std::function<void()> job;
-
                 bool has_job = false;
                 {
                     std::lock_guard lock(q.mtx);
@@ -72,7 +69,6 @@ namespace BA_Socket {
                         has_job = true;
                     }
                 }
-
                 if (has_job) {
                     auto stolen = steal(id);
                     if (stolen) {
@@ -80,18 +76,15 @@ namespace BA_Socket {
                         has_job = true;
                     }
                 }
-
-                if (has_job) {
+                if (has_job)
                     job();
-                } else {
+                else
                     std::this_thread::yield();
-                }
             }
         }
 
         std::atomic<bool> _running{true};
         std::atomic<size_t> _next{0};
-
         std::vector<Queue> _queues;
         std::vector<std::thread> _workers;
     };

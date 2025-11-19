@@ -22,8 +22,8 @@ namespace BA_Socket {
         ~Socket() { close(); };
 
         // non-copyable but movable
-        Socket(const Socket&) = delete;
-        Socket& operator=(const Socket&) = delete;
+        Socket(const Socket&) = default;
+        Socket& operator=(const Socket&) = default;
         Socket(Socket&& rhs) noexcept : _fd(rhs._fd) {
             rhs._fd = INVALID_SOCKET;
         }

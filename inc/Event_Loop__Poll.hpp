@@ -22,18 +22,15 @@ namespace BA_Socket {
             Callback on_disconnect)
             : _on_read(on_read),
             _on_write(on_write),
-            _on_disconnect(on_disconnect)
-        {}
+            _on_disconnect(on_disconnect) {}
 
         void register_fd(const Socket& s, EventType type) override {
             std::lock_guard lock(_mtx);
 
             int fd = s.native_handle();
-
             struct pollfd p{};
             p.fd = fd;
             p.events = (type == EventType::Read ? POLLIN : POLLOUT);
-
             _pollfds.push_back(p);
             _socket_map[fd] = s;
         }
@@ -44,8 +41,10 @@ namespace BA_Socket {
 
             // remove from pollfds
             _pollfds.erase(
-                std::remove_if(_pollfds.begin(), _pollfds.end(),
-                            [fd](const pollfd& p){ return p.fd == fd; }),
+                std::remove_if(
+                    _pollfds.begin(),
+                    _pollfds.end(),
+                    [fd](const pollfd& p){ return p.fd == fd; }),
                 _pollfds.end());
 
             _socket_map.erase(fd);
@@ -74,10 +73,8 @@ namespace BA_Socket {
     private:
         std::mutex _mtx;
         std::atomic<bool> _running{false};
-
         std::vector<pollfd> _pollfds;
         std::unordered_map<SOCKET, Socket> _socket_map;
-
         Callback _on_read, _on_write, _on_disconnect;
     };
 } // namespace BA_Socket

@@ -12,13 +12,7 @@ using namespace BA_Concurrency;
 
 namespace BA_Socket {
     class Worker_Pool__Concurrent_Queue_Blocking : public IWorker_Pool {
-
-        std::atomic<bool> _running{true};
-        Concurrent_Queue_Blocking<std::function<void()>> _queue;
-        std::vector<std::thread> _workers;
-
     public:
-
         explicit Worker_Pool__Concurrent_Queue_Blocking(
             size_t thread_count = std::thread::hardware_concurrency())
         {
@@ -33,15 +27,20 @@ namespace BA_Socket {
             }
         }
 
-        void submit(std::function<void()> job) override {
+        inline void submit(std::function<void()> job) override {
             _queue.push(std::move(job));
         }
 
-        void shutdown() override {
+        inline void shutdown() override {
             _running = false;
             _queue.stop();
             for (auto& t : _workers) t.join();
         }
+
+    private:
+        std::atomic<bool> _running{true};
+        Concurrent_Queue_Blocking<std::function<void()>> _queue;
+        std::vector<std::thread> _workers;
     };
 } // namespace BA_Socket
 

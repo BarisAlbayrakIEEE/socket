@@ -15,47 +15,46 @@ namespace BA_Socket {
     class Server_Strategy__Leader_Follower : public IServer_Strategy {
     public:
         Server_Strategy__Leader_Follower(IEvent_Loop& loop, IWorker_Pool& pool)
-            : _loop(loop), _pool(pool), _running(false)
-        {}
+            : _loop(loop), _pool(pool), _running(false) {}
 
-        void start() override {
+        inline void start() override {
             _running.store(true);
-            become_leader();          // first leader
+            become_leader(); // 1st leader
         }
 
-        void stop() override {
+        inline void stop() override {
             _running.store(false);
             _loop.stop();
             _pool.shutdown();
         }
 
         // Called by leader thread (event loop)
-        void on_accept(Socket client) override {
+        inline void on_accept(Socket client) override {
             dispath([client, this]() mutable {
-                //handle accept
+                TODO: handle accept;
             });
         }
 
-        void on_read_ready(Socket client) override {
+        inline void on_read_ready(Socket client) override {
             dispath([client, this]() mutable {
-                //handle read
+                TODO: handle read;
             });
         }
 
-        void on_write_ready(Socket client) override {
+        inline void on_write_ready(Socket client) override {
             dispath([client, this]() mutable {
-                //handle write
+                TODO: handle write;
             });
         }
 
-        void on_disconnect(Socket client) override {
+        inline void on_disconnect(Socket client) override {
             dispath([client, this]() mutable {
-                //handle disconnect
+                TODO: handle disconnect;
             });
         }
 
     private:
-        void dispath(std::function<void()> job) {
+        inline void dispath(std::function<void()> job) {
             _pool.submit([this, job]() {
                 job();
                 become_leader();
@@ -72,13 +71,11 @@ namespace BA_Socket {
 
             // Run event loop
             _loop.run();
-
             _is_leader = false;
         }
 
         IEvent_Loop& _loop;
         IWorker_Pool& _pool;
-
         std::mutex _leader_mtx;
         std::atomic<bool> _running;
         bool _is_leader = false;

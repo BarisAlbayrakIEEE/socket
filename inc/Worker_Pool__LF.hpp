@@ -14,27 +14,29 @@ using namespace BA_Concurrency;
 namespace BA_Socket {
     class Worker_Pool__LF : public IWorker_Pool {
     public:
-        Worker_Pool__LF(size_t thread_count = std::thread::hardware_concurrency())
+
+        explicit Worker_Pool__LF(
+            size_t thread_count = std::thread::hardware_concurrency())
         {
             for (size_t i = 0; i < thread_count; ++i) {
                 _workers.emplace_back([this] {
                     while (_running.load(std::memory_order_relaxed)) {
-                        std::function<void()> job;
-                        if (_queue.try_pop(job)) {
-                            job();
+                        auto job = _queue.try_pop();
+                        if (job.has_value()) {
+                            job.value().operator()();
                         } else {
-                            std::this_thread::yield(); // or sleep_for(0)
+                            std::this_thread::yield();
                         }
                     }
                 });
             }
         }
 
-        void submit(std::function<void()> job) override {
+        inline void submit(std::function<void()> job) override {
             _queue.push(std::move(job));
         }
 
-        void shutdown() override {
+        inline void shutdown() override {
             _running.store(false);
             for (auto& t : _workers) t.join();
         }
