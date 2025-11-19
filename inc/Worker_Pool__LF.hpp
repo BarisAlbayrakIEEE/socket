@@ -14,9 +14,9 @@ using namespace BA_Concurrency;
 namespace BA_Socket {
     class Worker_Pool__LF : public IWorker_Pool {
     public:
-        Worker_Pool__LF(size_t threads = std::thread::hardware_concurrency())
+        Worker_Pool__LF(size_t thread_count = std::thread::hardware_concurrency())
         {
-            for (size_t i = 0; i < threads; ++i) {
+            for (size_t i = 0; i < thread_count; ++i) {
                 _workers.emplace_back([this] {
                     while (_running.load(std::memory_order_relaxed)) {
                         std::function<void()> job;

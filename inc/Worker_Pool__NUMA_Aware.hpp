@@ -16,15 +16,15 @@ using namespace BA_Concurrency;
 namespace BA_Socket {
     class Worker_Pool__NUMA_Aware : public IWorker_Pool {
     public:
-        Worker_Pool__NUMA_Aware(size_t threads_per_node = 2)
+        Worker_Pool__NUMA_Aware(size_t thread_count_per_node = 2)
         {
-            size_t nodes = std::thread::hardware_concurrency() / threads_per_node;
+            size_t nodes = std::thread::hardware_concurrency() / thread_count_per_node;
             if (nodes == 0) nodes = 1;
 
             _queues.resize(nodes);
 
             for (size_t n = 0; n < nodes; ++n) {
-                for (size_t t = 0; t < threads_per_node; ++t) {
+                for (size_t t = 0; t < thread_count_per_node; ++t) {
                     _workers.emplace_back([this, n] {
                         pin_to_numa_node(n);
                         auto& q = _queues[n];

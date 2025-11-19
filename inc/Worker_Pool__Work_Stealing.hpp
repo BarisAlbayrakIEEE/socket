@@ -14,10 +14,10 @@
 namespace BA_Socket {
     class Worker_Pool__Work_Stealing : public IWorker_Pool {
     public:
-        Worker_Pool__Work_Stealing(size_t threads = std::thread::hardware_concurrency())
-            : _queues(threads)
+        Worker_Pool__Work_Stealing(size_t thread_count = std::thread::hardware_concurrency())
+            : _queues(thread_count)
         {
-            for (size_t i = 0; i < threads; ++i) {
+            for (size_t i = 0; i < thread_count; ++i) {
                 _workers.emplace_back([this, i] { worker_loop(i); });
             }
         }

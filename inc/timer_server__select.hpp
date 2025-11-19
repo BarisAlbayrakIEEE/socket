@@ -28,7 +28,7 @@ namespace BA_Socket {
 
         // Accept loop
         {
-            std::vector<std::jthread> client_threads;
+            std::vector<std::jthread> client_thread_count;
             while (1) {
                 fd_set reads = master;
 
@@ -66,7 +66,7 @@ namespace BA_Socket {
                         print_sockaddr<is_debug_mode>(client_addr, client_len);
 
                         // Spawnhandler thread
-                        client_threads.emplace_back(
+                        client_thread_count.emplace_back(
                             handle_client,
                             fd_client,
                             client_addr,

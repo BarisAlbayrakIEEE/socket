@@ -23,8 +23,8 @@ namespace BA_Socket {
 
     class Worker_Pool__Deadline : public IWorker_Pool {
     public:
-        Worker_Pool__Deadline(size_t threads = std::thread::hardware_concurrency()) {
-            for (size_t i=0; i<threads; ++i) {
+        Worker_Pool__Deadline(size_t thread_count = std::thread::hardware_concurrency()) {
+            for (size_t i=0; i<thread_count; ++i) {
                 _workers.emplace_back([this] {
                     worker_loop();
                 });

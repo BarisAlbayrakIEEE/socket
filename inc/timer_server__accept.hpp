@@ -34,7 +34,7 @@ namespace BA_Socket {
 
         // Accept loop
         {
-            std::vector<std::jthread> client_threads;
+            std::vector<std::jthread> client_thread_count;
             while (running) {
                 // accept a connection
                 PRINTF1("Accepting a connection...\n");
@@ -57,7 +57,7 @@ namespace BA_Socket {
                     CLOSE_SOCKET(fd_client);
                     break;
                 }
-                client_threads.emplace_back(
+                client_thread_count.emplace_back(
                     handle_client,
                     fd_client,
                     client_addr,

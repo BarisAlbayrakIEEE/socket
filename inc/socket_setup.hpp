@@ -146,4 +146,8 @@
         throw std::runtime_error(std::string("[select() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
 #endif
 
+namespace BA_Socket {
+    static const char Capacity_As_Pow2 = 8; // 256 slots per queue
+}
+
 #endif // SOCKET_SETUP_HPP
