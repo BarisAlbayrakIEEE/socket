@@ -4,7 +4,7 @@
 #define WORKER_POOL__NUMA_AWARE_H
 
 #include "IWorker_Pool.h"
-#include "Blocking_Queue.h"
+#include "Concurrent_Queue_Blocking.h"
 #include <thread>
 #include <vector>
 #include <atomic>
@@ -58,7 +58,7 @@ namespace ba_socket {
         std::atomic<bool> _running{true};
         std::atomic<size_t> _next{0};
 
-        std::vector<Blocking_Queue<std::function<void()>>> _queues;
+        std::vector<Concurrent_Queue_Blocking<std::function<void()>>> _queues;
         std::vector<std::thread> _workers;
     };
 } // namespace ba_socket

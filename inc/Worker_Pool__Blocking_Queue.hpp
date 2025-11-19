@@ -1,17 +1,21 @@
-// Worker_Pool__Blocking_Queue.h
+// Worker_Pool__Concurrent_Queue_Blocking.h
 
 #ifndef WORKER_POOL__BLOCKING_QUEUE_H
 #define WORKER_POOL__BLOCKING_QUEUE_H
 
-#include "IWorker_Pool.h"
-#include "Blocking_Queue.h"
+#include "IWorker_Pool.hpp"
+#include "Concurrent_Queue_Blocking.hpp"
 #include <vector>
 #include <thread>
 
+using namespace BA_Concurrency;
+
 namespace ba_socket {
-    class Worker_Pool__Blocking_Queue : public IWorker_Pool {
+    class Worker_Pool__Concurrent_Queue_Blocking : public IWorker_Pool {
     public:
-        explicit Worker_Pool__Blocking_Queue(size_t threads = std::thread::hardware_concurrency()) {
+        explicit Worker_Pool__Concurrent_Queue_Blocking(
+            size_t threads = std::thread::hardware_concurrency())
+        {
             for (size_t i = 0; i < threads; ++i) {
                 _workers.emplace_back([this] {
                     while (true) {
@@ -35,7 +39,7 @@ namespace ba_socket {
 
     private:
         std::atomic<bool> _running{true};
-        BlockingQueue<std::function<void()>> _queue;
+        Blocking_Queue<std::function<void()>> _queue;
         std::vector<std::thread> _workers;
     };
 } // namespace ba_socket
