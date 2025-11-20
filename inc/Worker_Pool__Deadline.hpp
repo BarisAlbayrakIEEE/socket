@@ -40,8 +40,7 @@ namespace BA_Socket {
         inline void submit(func_t job) override {
             Deadline_Job dj{
                 std::chrono::steady_clock::now(),
-                std::move(job)
-            };
+                std::move(job) };
             {
                 std::scoped_lock lk(_m);
                 _jobs.push(std::move(dj));
@@ -66,7 +65,7 @@ namespace BA_Socket {
                     _cv.wait(lk, [&]{ return !_jobs.empty() || !_running; });
                     if (!_running) break;
 
-                    job = _jobs.top();
+                    job = std::move(_jobs.top());
                     _jobs.pop();
                 }
                 job._func();
