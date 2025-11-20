@@ -7,53 +7,66 @@
 #include <deque>
 #include <mutex>
 #include <thread>
+#include <future>
 #include <vector>
 #include <atomic>
 #include <optional>
 
 namespace BA_Socket {
     class Worker_Pool__Work_Stealing : public IWorker_Pool {
-        struct Queue {
-            std::deque<std::function<void()>> dq;
-            std::mutex mtx;
+        struct Job_Deque {
+            std::deque<std::function<void()>> _job_deque;
+            std::mutex _m;
         };
+
     public:
+
         Worker_Pool__Work_Stealing(
             size_t thread_count = std::thread::hardware_concurrency())
-            : _queues(thread_count)
+            : _jds(thread_count)
         {
             for (size_t i = 0; i < thread_count; ++i)
-                _workers.emplace_back([this, i] { worker_loop(i); });
+                _threads.emplace_back([this, i] { worker_loop(i); });
         }
 
         ~Worker_Pool__Work_Stealing() {
-            if (_running.load())
-                shutdown();
+            if (_running) shutdown();
         }
 
-        inline void submit(std::function<void()> job) override {
-            size_t idx = _next++ % _queues.size();
-            {
-                std::lock_guard lock(_queues[idx].mtx);
-                _queues[idx].dq.push_back(std::move(job));
-            }
+        template <typename F, typename... Args>
+        auto submit(F&& f, Args&&... args)
+            -> std::future<std::invoke_result_t<F, Args...>>
+        {
+            using R = std::invoke_result_t<F, Args...>;
+
+            auto task = std::make_shared<std::packaged_task<R()>>(
+                std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+            std::future<R> fut = task->get_future();
+            size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _jds.size();
+            push_job(idx, [task]() { (*task)(); });
+
+            return fut;
         }
 
         inline void shutdown() override {
-            _running.store(false);
-            for (auto& t : _workers) t.join();
+            if (bool expected{true}; !_running.compare_exchange_strong(expected, false))
+                return;
+            for (auto& jd : _jds) std::scoped_lock lk(jd._m);
+            for (auto& t : _threads) if (t.joinable()) t.join();
         }
+
     private:
+    
         std::optional<std::function<void()>> steal(size_t hief) {
-            size_t n = _queues.size();
+            size_t n = _jds.size();
             for (size_t i = 0; i < n; ++i) {
                 size_t victim = (hief + i) % n;
                 if (victim == hief) continue;
 
-                std::lock_guard lock(_queues[victim].mtx);
-                if (!_queues[victim].dq.empty()) {
-                    auto job = std::move(_queues[victim].dq.front());
-                    _queues[victim].dq.pop_front();
+                std::scoped_lock lk(_jds[victim]._m);
+                if (!_jds[victim]._job_deque.empty()) {
+                    auto job = std::move(_jds[victim]._job_deque.front());
+                    _jds[victim]._job_deque.pop_front();
                     return job;
                 }
             }
@@ -61,19 +74,19 @@ namespace BA_Socket {
         }
 
         void worker_loop(size_t id) {
-            auto& q = _queues[id];
+            auto& jd = _jds[id];
             while (_running) {
                 std::function<void()> job;
                 bool has_job = false;
                 {
-                    std::lock_guard lock(q.mtx);
-                    if (!q.dq.empty()) {
-                        job = std::move(q.dq.back());
-                        q.dq.pop_back();
+                    std::scoped_lock lk(jd._m);
+                    if (!jd._job_deque.empty()) {
+                        job = std::move(jd._job_deque.back());
+                        jd._job_deque.pop_back();
                         has_job = true;
                     }
                 }
-                if (has_job) {
+                if (!has_job) {
                     auto stolen = steal(id);
                     if (stolen) {
                         job = *std::move(stolen);
@@ -89,8 +102,8 @@ namespace BA_Socket {
 
         std::atomic<bool> _running{true};
         std::atomic<size_t> _next{0};
-        std::vector<Queue> _queues;
-        std::vector<std::thread> _workers;
+        std::vector<Job_Deque> _jds;
+        std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket
 

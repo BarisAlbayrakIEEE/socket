@@ -19,11 +19,11 @@ namespace BA_Socket {
             size_t thread_count = std::thread::hardware_concurrency())
         {
             for (size_t i = 0; i < thread_count; ++i) {
-                _workers.emplace_back([this] {
+                _threads.emplace_back([this] {
                     while (_running.load(std::memory_order_relaxed)) {
-                        auto job = _queue.try_pop();
+                        auto job = _jobs.try_pop();
                         if (job.has_value()) {
-                            job.value().operator()();
+                            job.value()();
                         } else {
                             std::this_thread::yield();
                         }
@@ -33,23 +33,23 @@ namespace BA_Socket {
         }
 
         ~Worker_Pool__LF() {
-            if (_running.load())
-                shutdown();
+            if (_running) shutdown();
         }
 
         inline void submit(std::function<void()> job) override {
-            _queue.push(std::move(job));
+            _jobs.push(std::move(job));
         }
 
         inline void shutdown() override {
-            _running.store(false);
-            for (auto& t : _workers) t.join();
+            if (bool expected{true}; !_running.compare_exchange_strong(expected, false))
+                return;
+            for (auto& t : _threads) t.join();
         }
 
     private:
         std::atomic<bool> _running{true};
-        queue_LF_ring_MPMC<std::function<void()>, 8> _queue;
-        std::vector<std::thread> _workers;
+        queue_LF_ring_MPMC<std::function<void()>, 8> _jobs;
+        std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket
 

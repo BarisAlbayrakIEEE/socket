@@ -19,55 +19,45 @@ namespace BA_Socket {
         explicit Worker_Pool__Concurrent_Queue_Blocking(
             size_t thread_count = std::thread::hardware_concurrency())
         {
-            for (size_t i = 0; i < thread_count; ++i) {
-                _workers.emplace_back([this] {
-                    worker_loop();
-                });
-            }
-            for (size_t i = 0; i < thread_count; ++i) {
-                _workers.emplace_back([this] {
-                    while (true) {
-                        auto job = _queue.pop();
-                        if (!_running) break;
-                        if (job) job();
-                    }
-                });
-            }
+            for (size_t i = 0; i < thread_count; ++i)
+                _threads.emplace_back([this] { worker_loop(); });
         }
 
         ~Worker_Pool__Concurrent_Queue_Blocking() {
-            if (_running.load())
-                shutdown();
-        }
-
-        inline void submit(std::function<void()> job) override {
-            using Task = std::packaged_task<void()>;
-            _queue.push(std::move(job));
+            if (_running) shutdown();
         }
 
         template<typename F, typename... Args>
-        auto submit(F&& f, Args&&... args)
-        {
+        auto submit(F&& f, Args&&... args) {
             using R = std::invoke_result_t<F, Args...>;
-            using Task = std::packaged_task<R()>;
 
             auto task = std::make_shared<std::packaged_task<R()>>(
                 std::bind(std::forward<F>(f), std::forward<Args>(args)...));
             auto fut = task.get_future();
-            _queue.push([task]() { (*task)(); });
+            _jobs.push([task]() { (*task)(); });
+
             return fut;
         }
 
         inline void shutdown() override {
-            _running.store(false);
-            _queue.stop();
-            for (auto& t : _workers) t.join();
+            if (bool expected{true}; !_running.compare_exchange_strong(expected, false))
+                return;
+            _jobs.stop();
+            for (auto& t : _threads) t.join();
         }
 
     private:
+
+        inline void worker_loop() {
+            auto job = _jobs.pop();
+            while (_running.load() || job.has_value()) {
+                job.value()();
+            }
+        }
+
         std::atomic<bool> _running{true};
-        Concurrent_Queue_Blocking<std::function<void()>> _queue;
-        std::vector<std::thread> _workers;
+        Concurrent_Queue_Blocking<std::function<void()>> _jobs;
+        std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket
 

@@ -17,24 +17,25 @@ namespace BA_Socket {
             std::chrono::steady_clock::time_point deadline;
             std::function<void()> fn;
 
-            inline bool operator>(const Deadline_Job& other) const {
-                return deadline > other.deadline;
+            inline bool operator>(const Deadline_Job& rhs) const {
+                return deadline > rhs.deadline;
             }
         };
+
     public:
+
         explicit Worker_Pool__Deadline(
             size_t thread_count = std::thread::hardware_concurrency())
         {
             for (size_t i=0; i<thread_count; ++i) {
-                _workers.emplace_back([this] {
+                _threads.emplace_back([this] {
                     worker_loop();
                 });
             }
         }
 
         ~Worker_Pool__Deadline() {
-            if (_running.load())
-                shutdown();
+            if (_running) shutdown();
         }
 
         inline void submit(std::function<void()> job) override {
@@ -43,39 +44,41 @@ namespace BA_Socket {
                 std::move(job)
             };
             {
-                std::lock_guard lock(_mtx);
-                _pq.push(std::move(dj));
+                std::lock_guard lock(_m);
+                _jobs.push(std::move(dj));
             }
             _cv.notify_one();
         }
 
         inline void shutdown() override {
-            _running.store(false);
+            if (bool expected{true}; !_running.compare_exchange_strong(expected, false))
+                return;
             _cv.notify_all();
-            for (auto& t : _workers) t.join();
+            for (auto& t : _threads) t.join();
         }
 
     private:
+
         void worker_loop() {
             while (_running) {
                 Deadline_Job job;
                 {
-                    std::unique_lock lock(_mtx);
-                    _cv.wait(lock, [&]{ return !_pq.empty() || !_running; });
+                    std::unique_lock lock(_m);
+                    _cv.wait(lock, [&]{ return !_jobs.empty() || !_running; });
                     if (!_running) break;
 
-                    job = _pq.top();
-                    _pq.pop();
+                    job = _jobs.top();
+                    _jobs.pop();
                 }
                 job.fn();
             }
         }
 
         std::atomic<bool> _running{true};
-        std::priority_queue<Deadline_Job, std::vector<Deadline_Job>, std::greater<>> _pq;
-        std::mutex _mtx;
+        std::priority_queue<Deadline_Job, std::vector<Deadline_Job>, std::greater<>> _jobs;
+        std::mutex _m;
         std::condition_variable _cv;
-        std::vector<std::thread> _workers;
+        std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket
 

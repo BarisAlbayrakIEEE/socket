@@ -16,15 +16,15 @@ namespace BA_Socket {
     class Worker_Pool__Actor : public IWorker_Pool {
     public:
         Worker_Pool__Actor(size_t thread_count = std::thread::hardware_concurrency())
-            : _queues(thread_count)
+            : _jobs(thread_count)
         {
             for (size_t i = 0; i < thread_count; ++i) {
-                _workers.emplace_back([this, i] {
-                    auto& q = _queues[i];
+                _threads.emplace_back([this, i] {
+                    auto& q = _jobs[i];
                     while (_running.load(std::memory_order_relaxed)) {
                         auto job{ q.try_pop() };
                         if (job.has_value()) {
-                            job.value().operator()();
+                            job.value()();
                         } else {
                             std::this_thread::yield();
                         }
@@ -34,26 +34,26 @@ namespace BA_Socket {
         }
 
         ~Worker_Pool__Actor() {
-            if (_running.load())
-                shutdown();
+            if (_running) shutdown();
         }
 
         inline void submit(std::function<void()> job) override {
             // Simple round-robin dispatching
-            size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _queues.size();
-            _queues[idx].push(std::move(job));
+            size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _jobs.size();
+            _jobs[idx].push(std::move(job));
         }
 
         inline void shutdown() override {
-            _running.store(false);
-            for (auto& t : _workers) t.join();
+            if (bool expected{true}; !_running.compare_exchange_strong(expected, false))
+                return;
+            for (auto& t : _threads) t.join();
         }
 
     private:
         std::atomic<bool> _running{true};
         std::atomic<size_t> _next{0};
-        std::vector<queue_LF_ring_MPMC<std::function<void()>, Capacity_As_Pow2>> _queues;
-        std::vector<std::thread> _workers;
+        std::vector<queue_LF_ring_MPMC<std::function<void()>, Capacity_As_Pow2>> _jobs;
+        std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket
 
