@@ -47,9 +47,9 @@ namespace BA_Socket {
         }
 
     private:
-        std::atomic<bool> _running{true};
         queue_LF_ring_MPMC<func_t, 8> _jobs;
         std::vector<std::thread> _threads;
+        std::atomic<bool> _running{true};
     };
 } // namespace BA_Socket
 

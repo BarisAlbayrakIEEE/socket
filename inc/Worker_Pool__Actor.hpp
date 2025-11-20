@@ -51,10 +51,10 @@ namespace BA_Socket {
         }
 
     private:
-        std::atomic<bool> _running{true};
-        std::atomic<size_t> _next{0};
         std::vector<queue_LF_ring_MPMC<func_t, Capacity_As_Pow2>> _jobs;
         std::vector<std::thread> _threads;
+        std::atomic<size_t> _next{0};
+        std::atomic<bool> _running{true};
     };
 } // namespace BA_Socket
 

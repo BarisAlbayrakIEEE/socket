@@ -17,7 +17,7 @@ namespace BA_Socket {
         using func_t = std::function<void()>;
 
         struct Job_Deque {
-            std::deque<func_t> _job_deque;
+            std::deque<func_t> _deque;
             std::mutex _m;
         };
 
@@ -43,9 +43,13 @@ namespace BA_Socket {
 
             auto task = std::make_shared<std::packaged_task<R()>>(
                 std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-            std::future<R> fut = task->get_future();
-            size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _jds.size();
-            push_job(idx, [task]() { (*task)(); });
+            auto fut = task->get_future();
+            size_t id = _next.fetch_add(1, std::memory_order_relaxed) % _jds.size();
+            auto& jd = _jds[id];
+            {
+                std::scoped_lock lk(jd._m);
+                jd._deque.push_back(std::move([task]() { (*task)(); }));
+            }
 
             return fut;
         }
@@ -59,16 +63,16 @@ namespace BA_Socket {
 
     private:
     
-        std::optional<func_t> steal(size_t hief) {
+        std::optional<func_t> steal(size_t thief) {
             size_t n = _jds.size();
             for (size_t i = 0; i < n; ++i) {
-                size_t victim = (hief + i) % n;
-                if (victim == hief) continue;
+                size_t victim = (thief + i) % n;
+                if (victim == thief) continue;
 
                 std::scoped_lock lk(_jds[victim]._m);
-                if (!_jds[victim]._job_deque.empty()) {
-                    auto job = std::move(_jds[victim]._job_deque.front());
-                    _jds[victim]._job_deque.pop_front();
+                if (!_jds[victim]._deque.empty()) {
+                    auto job = std::move(_jds[victim]._deque.front());
+                    _jds[victim]._deque.pop_front();
                     return job;
                 }
             }
@@ -82,9 +86,9 @@ namespace BA_Socket {
                 bool has_job = false;
                 {
                     std::scoped_lock lk(jd._m);
-                    if (!jd._job_deque.empty()) {
-                        job = std::move(jd._job_deque.back());
-                        jd._job_deque.pop_back();
+                    if (!jd._deque.empty()) {
+                        job = std::move(jd._deque.back());
+                        jd._deque.pop_back();
                         has_job = true;
                     }
                 }
@@ -102,10 +106,10 @@ namespace BA_Socket {
             }
         }
 
-        std::atomic<bool> _running{true};
-        std::atomic<size_t> _next{0};
         std::vector<Job_Deque> _jds;
         std::vector<std::thread> _threads;
+        std::atomic<size_t> _next{0};
+        std::atomic<bool> _running{true};
     };
 } // namespace BA_Socket
 

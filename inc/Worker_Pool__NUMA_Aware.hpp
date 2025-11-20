@@ -61,10 +61,10 @@ namespace BA_Socket {
             sched_setaffinity(0, sizeof(set), &set);
         }
 
-        std::atomic<bool> _running{true};
-        std::atomic<size_t> _next{0};
         std::vector<Concurrent_Queue_Blocking<func_t>> _jobs;
         std::vector<std::thread> _threads;
+        std::atomic<size_t> _next{0};
+        std::atomic<bool> _running{true};
     };
 } // namespace BA_Socket
 

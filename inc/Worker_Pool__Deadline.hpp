@@ -16,11 +16,11 @@ namespace BA_Socket {
         using func_t = std::function<void()>;
 
         struct Deadline_Job {
-            std::chrono::steady_clock::time_point deadline;
-            func_t fn;
+            std::chrono::steady_clock::time_point _deadline;
+            func_t _func;
 
             inline bool operator>(const Deadline_Job& rhs) const {
-                return deadline > rhs.deadline;
+                return _deadline > rhs._deadline;
             }
         };
 
@@ -29,11 +29,8 @@ namespace BA_Socket {
         explicit Worker_Pool__Deadline(
             size_t thread_count = std::thread::hardware_concurrency())
         {
-            for (size_t i=0; i<thread_count; ++i) {
-                _threads.emplace_back([this] {
-                    worker_loop();
-                });
-            }
+            for (size_t i = 0; i < thread_count; ++i)
+                _threads.emplace_back([this] { worker_loop(); });
         }
 
         ~Worker_Pool__Deadline() {
@@ -46,7 +43,7 @@ namespace BA_Socket {
                 std::move(job)
             };
             {
-                std::scoped_lock lock(_m);
+                std::scoped_lock lk(_m);
                 _jobs.push(std::move(dj));
             }
             _cv.notify_one();
@@ -65,22 +62,22 @@ namespace BA_Socket {
             while (_running) {
                 Deadline_Job job;
                 {
-                    std::unique_lock lock(_m);
-                    _cv.wait(lock, [&]{ return !_jobs.empty() || !_running; });
+                    std::unique_lock lk(_m);
+                    _cv.wait(lk, [&]{ return !_jobs.empty() || !_running; });
                     if (!_running) break;
 
                     job = _jobs.top();
                     _jobs.pop();
                 }
-                job.fn();
+                job._func();
             }
         }
 
-        std::atomic<bool> _running{true};
         std::priority_queue<Deadline_Job, std::vector<Deadline_Job>, std::greater<>> _jobs;
-        std::mutex _m;
-        std::condition_variable _cv;
         std::vector<std::thread> _threads;
+        std::condition_variable _cv;
+        std::mutex _m;
+        std::atomic<bool> _running{true};
     };
 } // namespace BA_Socket
 

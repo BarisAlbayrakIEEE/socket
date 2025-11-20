@@ -56,9 +56,9 @@ namespace BA_Socket {
             }
         }
 
-        std::atomic<bool> _running{true};
         Concurrent_Queue_Blocking<func_t> _jobs;
         std::vector<std::thread> _threads;
+        std::atomic<bool> _running{true};
     };
 } // namespace BA_Socket
 
