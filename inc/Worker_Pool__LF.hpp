@@ -5,6 +5,7 @@
 
 #include "IWorker_Pool.hpp"
 #include "Concurrent_Queue_LF_Ring_MPMC.hpp"
+#include "socket_setup.hpp"
 #include <vector>
 #include <thread>
 #include <atomic>
@@ -47,7 +48,7 @@ namespace BA_Socket {
         }
 
     private:
-        queue_LF_ring_MPMC<func_t, 8> _jobs;
+        queue_LF_ring_MPMC<func_t, Capacity_As_Pow2> _jobs;
         std::vector<std::thread> _threads;
         std::atomic<bool> _running{true};
     };
