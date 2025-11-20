@@ -32,6 +32,11 @@ namespace BA_Socket {
             }
         }
 
+        ~Worker_Pool__Deadline() {
+            if (_running.load())
+                shutdown();
+        }
+
         inline void submit(std::function<void()> job) override {
             Deadline_Job dj{
                 std::chrono::steady_clock::now(),
@@ -45,7 +50,7 @@ namespace BA_Socket {
         }
 
         inline void shutdown() override {
-            _running = false;
+            _running.store(false);
             _cv.notify_all();
             for (auto& t : _workers) t.join();
         }

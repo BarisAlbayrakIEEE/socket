@@ -35,13 +35,18 @@ namespace BA_Socket {
             }
         }
 
+        ~Worker_Pool__NUMA_Aware() {
+            if (_running.load())
+                shutdown();
+        }
+
         inline void submit(std::function<void()> job) override {
             size_t idx = _next++ % _queues.size();
             _queues[idx].push(std::move(job));
         }
 
         inline void shutdown() override {
-            _running = false;
+            _running.store(false);
             for (auto& q : _queues) q.stop();
             for (auto& t : _workers) t.join();
         }

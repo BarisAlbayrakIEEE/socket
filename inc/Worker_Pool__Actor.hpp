@@ -33,6 +33,11 @@ namespace BA_Socket {
             }
         }
 
+        ~Worker_Pool__Actor() {
+            if (_running.load())
+                shutdown();
+        }
+
         inline void submit(std::function<void()> job) override {
             // Simple round-robin dispatching
             size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _queues.size();

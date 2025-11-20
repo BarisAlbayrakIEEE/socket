@@ -22,9 +22,13 @@ namespace BA_Socket {
             size_t thread_count = std::thread::hardware_concurrency())
             : _queues(thread_count)
         {
-            for (size_t i = 0; i < thread_count; ++i) {
+            for (size_t i = 0; i < thread_count; ++i)
                 _workers.emplace_back([this, i] { worker_loop(i); });
-            }
+        }
+
+        ~Worker_Pool__Work_Stealing() {
+            if (_running.load())
+                shutdown();
         }
 
         inline void submit(std::function<void()> job) override {
@@ -36,7 +40,7 @@ namespace BA_Socket {
         }
 
         inline void shutdown() override {
-            _running = false;
+            _running.store(false);
             for (auto& t : _workers) t.join();
         }
     private:

@@ -32,6 +32,11 @@ namespace BA_Socket {
             }
         }
 
+        ~Worker_Pool__LF() {
+            if (_running.load())
+                shutdown();
+        }
+
         inline void submit(std::function<void()> job) override {
             _queue.push(std::move(job));
         }

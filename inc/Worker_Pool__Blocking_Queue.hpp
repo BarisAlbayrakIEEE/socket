@@ -27,12 +27,17 @@ namespace BA_Socket {
             }
         }
 
+        ~Worker_Pool__Concurrent_Queue_Blocking() {
+            if (_running.load())
+                shutdown();
+        }
+
         inline void submit(std::function<void()> job) override {
             _queue.push(std::move(job));
         }
 
         inline void shutdown() override {
-            _running = false;
+            _running.store(false);
             _queue.stop();
             for (auto& t : _workers) t.join();
         }
