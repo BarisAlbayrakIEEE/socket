@@ -17,7 +17,7 @@ namespace BA_Socket {
         using func_t = std::function<void()>;
     public:
         Worker_Pool__Actor(size_t thread_count = std::thread::hardware_concurrency())
-            : _jobs(thread_count)
+            : _messages(thread_count)
         {
             for (size_t i = 0; i < thread_count; ++i)
                 _threads.emplace_back([this, i] { worker_loop(i); });
@@ -27,9 +27,9 @@ namespace BA_Socket {
             if (_running) shutdown();
         }
 
-        inline void submit(func_t job) override {
-            size_t id = _next.fetch_add(1, std::memory_order_relaxed) % _jobs.size();
-            _jobs[id].push(std::move(job));
+        inline void submit(func_t message) override {
+            size_t id = _next.fetch_add(1, std::memory_order_relaxed) % _messages.size();
+            _messages[id].push(std::move(message));
         }
 
         inline void shutdown() override {
@@ -41,15 +41,15 @@ namespace BA_Socket {
     private:
 
         inline void worker_loop(size_t id) {
-            auto& jobs = _jobs[id];
+            auto& messages = _messages[id];
             while (_running.load(std::memory_order_relaxed)) {
-                auto job{ jobs.try_pop() };
-                if (job) job.value()();
+                auto message{ messages.try_pop() };
+                if (message) message.value()();
                 else std::this_thread::yield();
             }
         }
 
-        std::vector<queue_LF_ring_MPSC<func_t, Capacity_As_Pow2>> _jobs;
+        std::vector<queue_LF_ring_MPSC<func_t, Capacity_As_Pow2>> _messages;
         std::vector<std::thread> _threads;
         std::atomic<size_t> _next{0};
         std::atomic<bool> _running{true};
