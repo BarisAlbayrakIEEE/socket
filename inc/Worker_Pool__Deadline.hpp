@@ -13,9 +13,11 @@
 
 namespace BA_Socket {
     class Worker_Pool__Deadline : public IWorker_Pool {
+        using func_t = std::function<void()>;
+
         struct Deadline_Job {
             std::chrono::steady_clock::time_point deadline;
-            std::function<void()> fn;
+            func_t fn;
 
             inline bool operator>(const Deadline_Job& rhs) const {
                 return deadline > rhs.deadline;
@@ -38,7 +40,7 @@ namespace BA_Socket {
             if (_running) shutdown();
         }
 
-        inline void submit(std::function<void()> job) override {
+        inline void submit(func_t job) override {
             Deadline_Job dj{
                 std::chrono::steady_clock::now(),
                 std::move(job)

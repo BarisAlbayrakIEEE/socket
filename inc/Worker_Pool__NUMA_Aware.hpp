@@ -15,6 +15,7 @@ using namespace BA_Concurrency;
 
 namespace BA_Socket {
     class Worker_Pool__NUMA_Aware : public IWorker_Pool {
+        using func_t = std::function<void()>;
     public:
         explicit Worker_Pool__NUMA_Aware(size_t thread_count_per_node = 2) {
             size_t nodes = std::thread::hardware_concurrency() / thread_count_per_node;
@@ -39,7 +40,7 @@ namespace BA_Socket {
             if (_running) shutdown();
         }
 
-        inline void submit(std::function<void()> job) override {
+        inline void submit(func_t job) override {
             size_t idx = _next++ % _jobs.size();
             _jobs[idx].push(std::move(job));
         }
@@ -62,7 +63,7 @@ namespace BA_Socket {
 
         std::atomic<bool> _running{true};
         std::atomic<size_t> _next{0};
-        std::vector<Concurrent_Queue_Blocking<std::function<void()>>> _jobs;
+        std::vector<Concurrent_Queue_Blocking<func_t>> _jobs;
         std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket

@@ -14,8 +14,10 @@
 
 namespace BA_Socket {
     class Worker_Pool__Work_Stealing : public IWorker_Pool {
+        using func_t = std::function<void()>;
+
         struct Job_Deque {
-            std::deque<std::function<void()>> _job_deque;
+            std::deque<func_t> _job_deque;
             std::mutex _m;
         };
 
@@ -57,7 +59,7 @@ namespace BA_Socket {
 
     private:
     
-        std::optional<std::function<void()>> steal(size_t hief) {
+        std::optional<func_t> steal(size_t hief) {
             size_t n = _jds.size();
             for (size_t i = 0; i < n; ++i) {
                 size_t victim = (hief + i) % n;
@@ -76,7 +78,7 @@ namespace BA_Socket {
         void worker_loop(size_t id) {
             auto& jd = _jds[id];
             while (_running) {
-                std::function<void()> job;
+                func_t job;
                 bool has_job = false;
                 {
                     std::scoped_lock lk(jd._m);

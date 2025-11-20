@@ -14,6 +14,7 @@ using namespace BA_Concurrency;
 
 namespace BA_Socket {
     class Worker_Pool__Actor : public IWorker_Pool {
+        using func_t = std::function<void()>;
     public:
         Worker_Pool__Actor(size_t thread_count = std::thread::hardware_concurrency())
             : _jobs(thread_count)
@@ -37,7 +38,7 @@ namespace BA_Socket {
             if (_running) shutdown();
         }
 
-        inline void submit(std::function<void()> job) override {
+        inline void submit(func_t job) override {
             // Simple round-robin dispatching
             size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _jobs.size();
             _jobs[idx].push(std::move(job));
@@ -52,7 +53,7 @@ namespace BA_Socket {
     private:
         std::atomic<bool> _running{true};
         std::atomic<size_t> _next{0};
-        std::vector<queue_LF_ring_MPMC<std::function<void()>, Capacity_As_Pow2>> _jobs;
+        std::vector<queue_LF_ring_MPMC<func_t, Capacity_As_Pow2>> _jobs;
         std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket

@@ -15,6 +15,7 @@ using namespace BA_Concurrency;
 
 namespace BA_Socket {
     class Worker_Pool__Concurrent_Queue_Blocking : public IWorker_Pool {
+        using func_t = std::function<void()>;
     public:
         explicit Worker_Pool__Concurrent_Queue_Blocking(
             size_t thread_count = std::thread::hardware_concurrency())
@@ -56,7 +57,7 @@ namespace BA_Socket {
         }
 
         std::atomic<bool> _running{true};
-        Concurrent_Queue_Blocking<std::function<void()>> _jobs;
+        Concurrent_Queue_Blocking<func_t> _jobs;
         std::vector<std::thread> _threads;
     };
 } // namespace BA_Socket
