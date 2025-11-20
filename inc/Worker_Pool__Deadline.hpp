@@ -46,7 +46,7 @@ namespace BA_Socket {
                 std::move(job)
             };
             {
-                std::lock_guard lock(_m);
+                std::scoped_lock lock(_m);
                 _jobs.push(std::move(dj));
             }
             _cv.notify_one();
