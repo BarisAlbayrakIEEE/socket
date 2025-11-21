@@ -11,6 +11,15 @@ namespace BA_Socket {
     enum class Enum_Event_Types { Read, Write };
     enum class Enum_Reactor_Command_Types { RegisterRead, RegisterWrite, Unregister, Error, eintr };
 
+    struct Reactor_Command {
+        Enum_Reactor_Command_Types type;
+        int fd;
+        std::string payload;
+    };
+
+
+
+
     using rc_t = std::pair<Enum_Reactor_Command_Types, int>;
     struct Reactor_Command_Pack{
         std::vector<rc_t> _rcs;
@@ -23,6 +32,7 @@ namespace BA_Socket {
 
         virtual void fd_register(int, Enum_Event_Types) = 0;
         virtual void fd_unregister(int) = 0;
+        virtual void close_sockets() = 0;
 
         virtual void run() = 0; // blocking
         virtual void stop() = 0;

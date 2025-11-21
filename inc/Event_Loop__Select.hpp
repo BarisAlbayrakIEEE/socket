@@ -20,8 +20,6 @@ namespace BA_Socket {
         }
 
         inline void fd_register(int fd, Enum_Event_Types type) override {
-            std::scoped_lock lk(_m);
-
             if (type == Enum_Event_Types::Read) {
                 FD_SET(fd, &_fds_read);
             } else {
@@ -31,13 +29,12 @@ namespace BA_Socket {
         }
 
         inline void fd_unregister(int fd) override {
-            std::scoped_lock lk(_m);
-
             FD_CLR(fd, &_fds_read);
             FD_CLR(fd, &_fds_write);
             if (fd == _fd_max) {
+                auto fd_max = _fd_max;
                 _fd_max = -1;
-                for(SOCKET fd = 0; fd <= _fd_max; ++fd) {
+                for(SOCKET fd = 0; fd <= fd_max; ++fd) {
                     if (FD_ISSET(fd, &_fds_read)) {
                         if (fd > _fd_max) _fd_max = fd;
                     }
@@ -91,6 +88,17 @@ namespace BA_Socket {
             }
         }
 
+        inline void close_sockets() override {
+            for (SOCKET fd = 0; fd <= _fd_max; ++fd) {
+                if (FD_ISSET(fd, &_fds_read)) {
+                    CLOSE_SOCKET(fd);
+                }
+                if (FD_ISSET(fd, &_fds_write)) {
+                    CLOSE_SOCKET(fd);
+                }
+            }
+        }
+
         inline void apply_rcp(const Reactor_Command_Pack& rcp) {
             for (const auto& rc : rcp._rcs) {
                 switch (rc.first) {
@@ -119,7 +127,6 @@ namespace BA_Socket {
         fd_set _fds_read;
         fd_set _fds_write;
         int _fd_max = -1;
-        std::mutex _m;
         std::atomic<bool> _running{false};
     };
 } // namespace BA_Socket
