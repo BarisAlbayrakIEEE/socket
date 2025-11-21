@@ -62,7 +62,7 @@ public:
 
         // Wake all workers
         for (auto& q : _queues) {
-            std::lock_guard lk(q._m);
+            std::scoped_lock lk(q._m);
             q._stopped = true;
         }
 
@@ -84,7 +84,7 @@ private:
     void push_job(size_t idx, std::function<void()> job) {
         Queue& q = _queues[idx];
         {
-            std::lock_guard lk(q._m);
+            std::scoped_lock lk(q._m);
             q._job_deque.push_back(std::move(job));
         }
     }
@@ -98,7 +98,7 @@ private:
             size_t victim = (thief_id + k) % n;
 
             Queue& q = _queues[victim];
-            std::lock_guard lk(q._m);
+            std::scoped_lock lk(q._m);
 
             if (!q._job_deque.empty()) {
                 auto job = std::move(q._job_deque.front());
@@ -120,7 +120,7 @@ private:
 
             // Try to pop from own deque
             {
-                std::lock_guard lk(myq._m);
+                std::scoped_lock lk(myq._m);
                 if (!myq._job_deque.empty()) {
                     job = std::move(myq._job_deque.back());
                     myq._job_deque.pop_back();
