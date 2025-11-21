@@ -9,6 +9,7 @@
 
 namespace BA_Socket {
     enum class Enum_Event_Types { Read, Write };
+    enum class Enum_Reactor_Command_Types { None, Register, Unregister, Close, WriteData };
 
     class IEvent_Loop {
     public:
