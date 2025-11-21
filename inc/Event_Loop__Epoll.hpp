@@ -12,6 +12,8 @@
 
 namespace BA_Socket {
     class Event_Loop__Epoll : public IEvent_Loop {
+        using Callback = std::function<void(const Socket&)>;
+        using sockmap_t = std::unordered_map<SOCKET, Socket>;
     public:
         Event_Loop__Epoll(
             Callback on_read,
@@ -31,24 +33,25 @@ namespace BA_Socket {
             ::close(_epfd);
         }
 
-        void register_fd(const Socket& s, EventType type) override {
-            std::lock_guard lock(_mtx);
+        inline void fd_register(const Socket& s, Enum_Event_Types type) override {
+            std::scoped_lock lk(_m);
 
             int fd = s.native_handle();
             epoll_event ev{};
             ev.data.fd = fd;
-            ev.events = (type == EventType::Read ? EPOLLIN : EPOLLOUT);
+            ev.events = (type == Enum_Event_Types::Read ? EPOLLIN : EPOLLOUT);
             if (::epoll_ctl(_epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
                 throw std::runtime_error("epoll_ctl ADD failed");
 
-            _socket_map[fd] = s;
+            _sockmap[fd] = s;
         }
 
-        void unregister_fd(const Socket& s) override {
-            std::lock_guard lock(_mtx);
+        inline void fd_unregister(const Socket& s) override {
+            std::scoped_lock lk(_m);
+
             int fd = s.native_handle();
             ::epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, nullptr);
-            _socket_map.erase(fd);
+            _sockmap.erase(fd);
         }
 
         void run() override {
@@ -64,24 +67,24 @@ namespace BA_Socket {
                     int fd = events[i].data.fd;
 
                     if (events[i].events & EPOLLIN)
-                        _on_read(_socket_map.at(fd));
+                        _on_read(_sockmap.at(fd));
 
                     if (events[i].events & EPOLLOUT)
-                        _on_write(_socket_map.at(fd));
+                        _on_write(_sockmap.at(fd));
 
                     if (events[i].events & (EPOLLERR | EPOLLHUP))
-                        _on_disconnect(_socket_map.at(fd));
+                        _on_disconnect(_sockmap.at(fd));
                 }
             }
         }
 
-        void stop() override { _running.store(false); }
+        inline void stop() override { _running.store(false); }
 
     private:
-        std::unordered_map<SOCKET, Socket> _socket_map;
+        sockmap_t _sockmap;
         Callback _on_read, _on_write, _on_disconnect;
         int _epfd;
-        std::mutex _mtx;
+        std::mutex _m;
         std::atomic<bool> _running{false};
     };
 } // namespace BA_Socket

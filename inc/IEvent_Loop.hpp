@@ -8,17 +8,16 @@
 #include "Socket.hpp"
 
 namespace BA_Socket {
-    using Callback = std::function<void(const Socket&)>;
-    enum class EventType { Read, Write };
+    enum class Enum_Event_Types { Read, Write };
 
     class IEvent_Loop {
     public:
         virtual ~IEvent_Loop() = default;
 
-        virtual void register_fd(const Socket& s, EventType type) = 0;
-        virtual void unregister_fd(const Socket& s) = 0;
+        virtual void fd_register(const Socket& s, Enum_Event_Types type) = 0;
+        virtual void fd_unregister(const Socket& s) = 0;
 
-        virtual void run() = 0;      // blocking
+        virtual void run() = 0; // blocking
         virtual void stop() = 0;
     };
 } // namespace BA_Socket

@@ -3,11 +3,42 @@
 #ifndef TCP_SERVER_HPP
 #define TCP_SERVER_HPP
 
-#include "Socket.hpp"
-#include "utility_addr.hpp"
+#include "Event_Loop__Select.hpp"
 #include <ctype.h>
 
 namespace BA_Socket {
+    void on_read(const Socket& s) {
+        SOCKET fd = s.native_handle();
+
+        // accept a new connection
+        PRINTF1("[Server]: Accepting a new connection...\n");
+        fflush(stdout);
+        struct sockaddr_storage client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        SOCKET fd_client = ::accept(
+            fd,
+            (struct sockaddr*) &client_addr,
+            &client_len);
+        if (!IS_VALID_SOCKET(fd_client)) {
+            if (GET_SOCKET_ERRNO() == EINTR) return 1; // Ctrl+C pressed
+            SOCKET_ERROR__ACCEPT();
+            return 1;
+        }
+        print_sockaddr<is_debug_mode>(client_addr, client_len);
+
+        // add the new client socket to the master set
+        FD_SET(fd_client, &master);
+        if (fd_client > fd_max) fd_max = fd_client;
+    };
+    void on_write(const Socket& s) {
+        
+    };
+    void on_disconnect(const Socket& s) {
+        
+    };
+
+
+
     int TCP_server_helper() {
         // create the server socket and bind to the local address
         PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
@@ -18,6 +49,9 @@ namespace BA_Socket {
         // listen for connections
         PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
         if (!socket_listen.listen(10)) return 1;
+
+        // create the event looop
+        Event_Loop__Select el = 
 
         // create the fd_set
         fd_set master;

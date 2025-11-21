@@ -12,6 +12,8 @@
 
 namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
+        using Callback = std::function<void(const Socket&)>;
+        using sockmap_t = std::unordered_map<SOCKET, Socket>;
     public:
         Event_Loop__Select(
             Callback on_read,
@@ -26,22 +28,21 @@ namespace BA_Socket {
             FD_ZERO(&_fds_write);
         }
 
-        inline void register_fd(const Socket& s, EventType type) override {
-            std::lock_guard lock(_mtx);
-            int fd = s.native_handle();
-            if (type == EventType::Read)
-                _read_map[fd] = s;
-            else
-                _write_map[fd] = s;
+        inline void fd_register(const Socket& s, Enum_Event_Types type) override {
+            std::scoped_lock lk(_m);
 
+            int fd = s.native_handle();
+            if (type == Enum_Event_Types::Read) _sockmap_read[fd] = s;
+            else _sockmap_write[fd] = s;
             update_fd_sets();
         }
 
-        inline void unregister_fd(const Socket& s) override {
-            std::lock_guard lock(_mtx);
+        inline void fd_unregister(const Socket& s) override {
+            std::scoped_lock lk(_m);
+
             int fd = s.native_handle();
-            _read_map.erase(fd);
-            _write_map.erase(fd);
+            _sockmap_read.erase(fd);
+            _sockmap_write.erase(fd);
             update_fd_sets();
         }
 
@@ -55,12 +56,8 @@ namespace BA_Socket {
                 int ready = ::select(nfds, &rcopy, &wcopy, nullptr, nullptr);
                 if (ready < 0) continue;
 
-                for (auto& [fd, sock] : _read_map)
-                    if (FD_ISSET(fd, &rcopy))
-                        _on_read(sock);
-                for (auto& [fd, sock] : _write_map)
-                    if (FD_ISSET(fd, &wcopy))
-                        _on_write(sock);
+                for (auto& [fd, sock] : _sockmap_read) if (FD_ISSET(fd, &rcopy)) _on_read(sock);
+                for (auto& [fd, sock] : _sockmap_write) if (FD_ISSET(fd, &wcopy)) _on_write(sock);
             }
         }
 
@@ -71,23 +68,23 @@ namespace BA_Socket {
             FD_ZERO(&_fds_read);
             FD_ZERO(&_fds_write);
             _max_fd = 0;
-            for (auto& [fd, sock] : _read_map) {
+            for (auto& [fd, sock] : _sockmap_read) {
                 FD_SET(fd, &_fds_read);
                 if (fd > _max_fd) _max_fd = fd;
             }
-            for (auto& [fd, sock] : _write_map) {
+            for (auto& [fd, sock] : _sockmap_write) {
                 FD_SET(fd, &_fds_write);
                 if (fd > _max_fd) _max_fd = fd;
             }
         }
 
-        std::unordered_map<SOCKET, Socket> _read_map;
-        std::unordered_map<SOCKET, Socket> _write_map;
+        sockmap_t _sockmap_read;
+        sockmap_t _sockmap_write;
         Callback _on_read, _on_write, _on_disconnect;
         fd_set _fds_read;
         fd_set _fds_write;
         int _max_fd = 0;
-        std::mutex _mtx;
+        std::mutex _m;
         std::atomic<bool> _running{false};
     };
 } // namespace BA_Socket
