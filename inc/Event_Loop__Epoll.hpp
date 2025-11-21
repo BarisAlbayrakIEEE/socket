@@ -13,8 +13,6 @@
 namespace BA_Socket {
     class Event_Loop__Epoll : public IEvent_Loop {
     public:
-        using Callback = std::function<void(const Socket&)>;
-
         Event_Loop__Epoll(
             Callback on_read,
             Callback on_write,
@@ -80,11 +78,11 @@ namespace BA_Socket {
         void stop() override { _running.store(false); }
 
     private:
+        std::unordered_map<SOCKET, Socket> _socket_map;
+        Callback _on_read, _on_write, _on_disconnect;
         int _epfd;
         std::mutex _mtx;
         std::atomic<bool> _running{false};
-        std::unordered_map<SOCKET, Socket> _socket_map;
-        Callback _on_read, _on_write, _on_disconnect;
     };
 } // namespace BA_Socket
 

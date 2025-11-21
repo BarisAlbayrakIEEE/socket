@@ -10,6 +10,8 @@
 #include <stop_token>
 #include <thread>
 
+using namespace BA_Concurrency;
+
 namespace BA_Socket {
 
     class Server_Strategy__Message_Passing_Reactor : public IServer_Strategy {

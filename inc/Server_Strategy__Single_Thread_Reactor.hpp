@@ -7,6 +7,8 @@
 #include "IEvent_Loop.hpp"
 #include "IThread_Pool.hpp"
 
+using namespace BA_Concurrency;
+
 namespace BA_Socket {
     class Server_Strategy__Single_thread_Reactor : public IServer_Strategy {
     public:

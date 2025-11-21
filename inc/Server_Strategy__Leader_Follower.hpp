@@ -11,6 +11,8 @@
 #include <queue>
 #include <atomic>
 
+using namespace BA_Concurrency;
+
 namespace BA_Socket {
     class Server_Strategy__Leader_Follower : public IServer_Strategy {
     public:

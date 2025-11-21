@@ -13,8 +13,6 @@
 namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
     public:
-        using Callback = std::function<void(const Socket&)>;
-
         Event_Loop__Select(
             Callback on_read,
             Callback on_write,
@@ -24,8 +22,8 @@ namespace BA_Socket {
             _on_write(on_write),
             _on_disconnect(on_disconnect)
         {
-            FD_ZERO(&_readfds);
-            FD_ZERO(&_writefds);
+            FD_ZERO(&_fds_read);
+            FD_ZERO(&_fds_write);
         }
 
         inline void register_fd(const Socket& s, EventType type) override {
@@ -50,8 +48,8 @@ namespace BA_Socket {
         void run() override {
             _running.store(true);
             while (_running.load()) {
-                fd_set rcopy = _readfds;
-                fd_set wcopy = _writefds;
+                fd_set rcopy = _fds_read;
+                fd_set wcopy = _fds_write;
 
                 int nfds = _max_fd + 1;
                 int ready = ::select(nfds, &rcopy, &wcopy, nullptr, nullptr);
@@ -70,27 +68,27 @@ namespace BA_Socket {
 
     private:
         void update_fd_sets() {
-            FD_ZERO(&_readfds);
-            FD_ZERO(&_writefds);
+            FD_ZERO(&_fds_read);
+            FD_ZERO(&_fds_write);
             _max_fd = 0;
             for (auto& [fd, sock] : _read_map) {
-                FD_SET(fd, &_readfds);
+                FD_SET(fd, &_fds_read);
                 if (fd > _max_fd) _max_fd = fd;
             }
             for (auto& [fd, sock] : _write_map) {
-                FD_SET(fd, &_writefds);
+                FD_SET(fd, &_fds_write);
                 if (fd > _max_fd) _max_fd = fd;
             }
         }
 
-        int _max_fd = 0;
-        std::mutex _mtx;
-        std::atomic<bool> _running{false};
-        fd_set _readfds;
-        fd_set _writefds;
         std::unordered_map<SOCKET, Socket> _read_map;
         std::unordered_map<SOCKET, Socket> _write_map;
         Callback _on_read, _on_write, _on_disconnect;
+        fd_set _fds_read;
+        fd_set _fds_write;
+        int _max_fd = 0;
+        std::mutex _mtx;
+        std::atomic<bool> _running{false};
     };
 } // namespace BA_Socket
 

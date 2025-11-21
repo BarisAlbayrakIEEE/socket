@@ -8,6 +8,7 @@
 #include "Socket.hpp"
 
 namespace BA_Socket {
+    using Callback = std::function<void(const Socket&)>;
     enum class EventType { Read, Write };
 
     class IEvent_Loop {
