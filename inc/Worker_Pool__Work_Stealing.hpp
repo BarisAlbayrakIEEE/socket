@@ -14,10 +14,10 @@
 
 namespace BA_Socket {
     class Worker_Pool__Work_Stealing : public IWorker_Pool {
-        using func_t = std::function<void()>;
+        using job_t = std::function<void()>;
 
         struct Job_Deque {
-            std::deque<func_t> _deque;
+            std::deque<job_t> _jd;
             std::mutex _m;
         };
 
@@ -48,7 +48,7 @@ namespace BA_Socket {
             auto& jd = _jds[id];
             {
                 std::scoped_lock lk(jd._m);
-                jd._deque.push_back(std::move([task]() { (*task)(); }));
+                jd._jd.push_back(std::move([task]() { (*task)(); }));
             }
 
             return fut;
@@ -63,16 +63,16 @@ namespace BA_Socket {
 
     private:
     
-        std::optional<func_t> steal(size_t thief) {
+        std::optional<job_t> steal(size_t thief) {
             size_t n = _jds.size();
             for (size_t i = 0; i < n; ++i) {
                 size_t victim = (thief + i) % n;
                 if (victim == thief) continue;
 
                 std::scoped_lock lk(_jds[victim]._m);
-                if (!_jds[victim]._deque.empty()) {
-                    auto job = std::move(_jds[victim]._deque.front());
-                    _jds[victim]._deque.pop_front();
+                if (!_jds[victim]._jd.empty()) {
+                    auto job = std::move(_jds[victim]._jd.front());
+                    _jds[victim]._jd.pop_front();
                     return job;
                 }
             }
@@ -82,13 +82,13 @@ namespace BA_Socket {
         void worker_loop(size_t id) {
             auto& jd = _jds[id];
             while (_running) {
-                func_t job;
+                job_t job;
                 bool has_job = false;
                 {
                     std::scoped_lock lk(jd._m);
-                    if (!jd._deque.empty()) {
-                        job = std::move(jd._deque.back());
-                        jd._deque.pop_back();
+                    if (!jd._jd.empty()) {
+                        job = std::move(jd._jd.back());
+                        jd._jd.pop_back();
                         has_job = true;
                     }
                 }

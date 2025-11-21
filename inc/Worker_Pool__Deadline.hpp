@@ -13,11 +13,11 @@
 
 namespace BA_Socket {
     class Worker_Pool__Deadline : public IWorker_Pool {
-        using func_t = std::function<void()>;
+        using job_t = std::function<void()>;
 
         struct Deadline_Job {
             std::chrono::steady_clock::time_point _deadline;
-            func_t _func;
+            job_t _job;
 
             inline bool operator>(const Deadline_Job& rhs) const {
                 return _deadline > rhs._deadline;
@@ -37,13 +37,11 @@ namespace BA_Socket {
             if (_running) shutdown();
         }
 
-        inline void submit(func_t job) override {
-            Deadline_Job dj{
-                std::chrono::steady_clock::now(),
-                std::move(job) };
+        inline void submit(job_t job) override {
+            Deadline_Job dj{ std::chrono::steady_clock::now(), std::move(job) };
             {
                 std::scoped_lock lk(_m);
-                _jobs.push(std::move(dj));
+                _djs.push(std::move(dj));
             }
             _cv.notify_one();
         }
@@ -59,20 +57,20 @@ namespace BA_Socket {
 
         void worker_loop() {
             while (_running) {
-                Deadline_Job job;
+                Deadline_Job dj;
                 {
                     std::unique_lock lk(_m);
-                    _cv.wait(lk, [&]{ return !_jobs.empty() || !_running; });
+                    _cv.wait(lk, [&]{ return !_djs.empty() || !_running; });
                     if (!_running) break;
 
-                    job = std::move(_jobs.top());
-                    _jobs.pop();
+                    dj = std::move(_djs.top());
+                    _djs.pop();
                 }
-                job._func();
+                dj._job();
             }
         }
 
-        std::priority_queue<Deadline_Job, std::vector<Deadline_Job>, std::greater<>> _jobs;
+        std::priority_queue<Deadline_Job, std::vector<Deadline_Job>, std::greater<>> _djs;
         std::vector<std::thread> _threads;
         std::condition_variable _cv;
         std::mutex _m;
