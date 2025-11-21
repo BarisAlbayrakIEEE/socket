@@ -1,153 +1,106 @@
-#pragma once
-#include "IWorkerPool.hpp"
-#include <deque>
-#include <mutex>
+// Worker_Pool__Actor.h
+
+#ifndef WORKER_POOL__ACTOR_HPP
+#define WORKER_POOL__ACTOR_HPP
+
+#include "IWorker_Pool.hpp"
+#include "Concurrent_Queue_LF_Ring_MPSC.hpp"
+#include "socket_setup.hpp"
+#include <vector>
 #include <thread>
 #include <atomic>
-#include <future>
-#include <optional>
-#include <vector>
-#include <functional>
-#include <numeric>
 
-class WorkStealingWorkerPool : public IWorkerPool {
-public:
-    explicit WorkStealingWorkerPool(size_t threads = std::thread::hardware_concurrency())
-        : _running(true),
-          _queues(threads)
-    {
-        for (size_t i = 0; i < threads; ++i)
-            _workers.emplace_back([this, i] { worker_loop(i); });
-    }
+using namespace BA_Concurrency;
 
-    ~WorkStealingWorkerPool() {
-        shutdown();
-    }
+namespace BA_Socket {
+    class Actor_Ref;
+    class Worker_Pool__Actor;
+    using msg_t = std::function<void(Actor_Ref)>;
+    using msg_queue_t = queue_LF_ring_MPSC<msg_t, Capacity_As_Pow2>;
 
-    // ============================================================
-    //  submit(F, Args...) -> std::future<R>
-    // ============================================================
-    template <typename F, typename... Args>
-    auto submit(F&& f, Args&&... args)
-        -> std::future<std::invoke_result_t<F, Args...>>
-    {
-        using R = std::invoke_result_t<F, Args...>;
+    class Actor_Ref {
+        friend class Worker_Pool__Actor;
+    public:
+        Actor_Ref() : _id(SIZE_MAX), _messages(nullptr) {}
+        Actor_Ref(size_t id, std::vector<msg_queue_t>* messages) : _id(id), _messages(messages) {}
 
-        // Bind user function + args → zero-arg callable
-        auto bound = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
+        bool valid() const {
+            return _messages && _id != SIZE_MAX;
+        }
+        size_t id() const { return _id; }
 
-        // Create packaged_task<R()>
-        auto task = std::make_shared<std::packaged_task<R()>>(std::move(bound));
-        std::future<R> fut = task->get_future();
-
-        // Wrap into std::function<void()>
-        std::function<void()> job = [task]() {
-            (*task)();
-        };
-
-        // Push job into this thread's queue (round-robin)
-        size_t idx = _next.fetch_add(1, std::memory_order_relaxed) % _queues.size();
-        push_job(idx, std::move(job));
-
-        return fut;
-    }
-
-    // ============================================================
-    //  shutdown(): stop workers and join them
-    // ============================================================
-    void shutdown() override {
-        bool expected = true;
-        if (!_running.compare_exchange_strong(expected, false))
-            return;
-
-        // Wake all workers
-        for (auto& q : _queues) {
-            std::scoped_lock lk(q._m);
-            q._stopped = true;
+        template <typename F>
+        inline void send(F&& f) const {
+            if (!valid()) return;
+            (*_messages)[_id].push(msg_t([job = std::forward<F>(f)](Actor_Ref self) { job(self); }));
+        }
+        template <typename F>
+        void send_to(size_t id, F&& f) const {
+            if (!valid())
+                return;
+            (*_messages)[id].push(msg_t([job = std::forward<F>(f)](Actor_Ref self) { job(self); }));
         }
 
-        for (auto& t : _workers)
-            if (t.joinable())
-                t.join();
-    }
-
-private:
-    struct Queue {
-        std::deque<std::function<void()>> _job_deque;
-        std::mutex _m;
-        bool _stopped = false;
+    private:
+        size_t _id;
+        std::vector<msg_queue_t>* _messages;
     };
 
-    // ============================================================
-    //  Push job into worker's deque (back)
-    // ============================================================
-    void push_job(size_t idx, std::function<void()> job) {
-        Queue& q = _queues[idx];
-        {
-            std::scoped_lock lk(q._m);
-            q._job_deque.push_back(std::move(job));
+    class Worker_Pool__Actor {
+    public:
+        explicit Worker_Pool__Actor(size_t thread_count) {
+            if (thread_count == 0) thread_count = 1;
+
+            _messages.resize(thread_count);
+            _actor_refs.reserve(thread_count);
+            for (size_t i = 0; i < thread_count; ++i)
+                _actor_refs.emplace_back(i, &_messages);
+            for (size_t i = 0; i < thread_count; ++i)
+                _workers.emplace_back([this, i] { worker_loop(i); });
         }
-    }
 
-    // ============================================================
-    //  Try to steal job from another worker (front)
-    // ============================================================
-    std::optional<std::function<void()>> steal(size_t thief_id) {
-        size_t n = _queues.size();
-        for (size_t k = 1; k < n; ++k) {
-            size_t victim = (thief_id + k) % n;
-
-            Queue& q = _queues[victim];
-            std::scoped_lock lk(q._m);
-
-            if (!q._job_deque.empty()) {
-                auto job = std::move(q._job_deque.front());
-                q._job_deque.pop_front();
-                return job;
-            }
+        ~Worker_Pool__Actor() {
+            shutdown();
         }
-        return std::nullopt;
-    }
 
-    // ============================================================
-    //  Worker main loop
-    // ============================================================
-    void worker_loop(size_t id) {
-        Queue& myq = _queues[id];
+        Actor_Ref get_actor_ref(size_t i) const {
+            return _actor_refs[i];
+        }
 
-        while (_running.load(std::memory_order_relaxed)) {
-            std::function<void()> job;
+        template <typename F>
+        void submit(F&& f) {
+            msg_t job = [job = std::forward<F>(f)](Actor_Ref self) {
+                job(self);
+            };
 
-            // Try to pop from own deque
-            {
-                std::scoped_lock lk(myq._m);
-                if (!myq._job_deque.empty()) {
-                    job = std::move(myq._job_deque.back());
-                    myq._job_deque.pop_back();
-                }
-            }
+            size_t id = _next.fetch_add(1, std::memory_order_relaxed) % _messages.size();
+            _messages[id].push(std::move(job));
+        }
 
-            if (!job) {
-                // Attempt to steal
-                auto stolen = steal(id);
-                if (stolen)
-                    job = std::move(*stolen);
-            }
+        void shutdown() {
+            bool expected = true;
+            if (!_running.compare_exchange_strong(expected, false))
+                return;
+            for (auto& t : _workers) if (t.joinable()) t.join();
+        }
 
-            if (job) {
-                job();         // execute job => fulfills future
-            } else {
-                std::this_thread::yield();
+    private:
+
+        void worker_loop(size_t id) {
+            Actor_Ref self = _actor_refs[id];
+            while (_running.load(std::memory_order_relaxed)) {
+                auto msg = _messages[id].try_pop();
+                if (msg) msg.value()(self);
+                else std::this_thread::yield();
             }
         }
-    }
 
-    // ============================================================
-    //  Members
-    // ============================================================
-    std::atomic<bool> _running;
-    std::atomic<size_t> _next{0};
+        std::vector<msg_queue_t> _messages;    
+        std::vector<Actor_Ref> _actor_refs;
+        std::vector<std::thread> _workers;
+        std::atomic<size_t> _next{0};
+        std::atomic<bool> _running{true};
+    };
+}
 
-    std::vector<Queue> _queues;
-    std::vector<std::thread> _workers;
-};
+#endif // WORKER_POOL__ACTOR_HPP
