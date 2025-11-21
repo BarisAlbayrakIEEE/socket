@@ -14,79 +14,90 @@ using namespace BA_Concurrency;
 
 namespace BA_Socket {
     class Actor_Ref;
-    using func_t = std::function<void(Actor_Ref)>;
-    using MPSC_queue_t = queue_LF_ring_MPSC<func_t, Capacity_As_Pow2>;
-    using MPSC_queues_t = std::vector<MPSC_queue_t>;
+    class Worker_Pool__Actor;
+    using msg_t = std::function<void(Actor_Ref)>;
+    using mailbox_t = queue_LF_ring_MPSC<msg_t, Capacity_As_Pow2>;
 
     class Actor_Ref {
+        friend class Worker_Pool__Actor;
     public:
-        Actor_Ref() = default;
-        Actor_Ref(size_t id, MPSC_queues_t* mailboxes)
-            : _id(id), _mailboxes(mailboxes) {}
+        Actor_Ref() : _id(SIZE_MAX), _mailboxs(nullptr) {}
+        Actor_Ref(size_t id, std::vector<mailbox_t>* messages) : _id(id), _mailboxs(messages) {}
+
+        bool valid() const {
+            return _mailboxs && _id != SIZE_MAX;
+        }
+        size_t id() const { return _id; }
 
         template <typename F>
-        void send(F&& f) const {
-            (*_mailboxes)[_id].push(Job(std::forward<F>(f)));
+        inline void send_self(F&& f) const {
+            if (!valid()) return;
+            (*_mailboxs)[_id].push(msg_t([job = std::forward<F>(f)](Actor_Ref self) { job(self); }));
+        }
+        template <typename F>
+        void send_to(size_t id, F&& f) const {
+            if (!valid())
+                return;
+            (*_mailboxs)[id].push(msg_t([job = std::forward<F>(f)](Actor_Ref self) { job(self); }));
         }
 
     private:
         size_t _id;
-        MPSC_queues_t* _mailboxes;
+        std::vector<mailbox_t>* _mailboxs;
     };
 
-    class Worker_Pool__Actor : public IWorker_Pool {
+    class Worker_Pool__Actor {
     public:
-        Worker_Pool__Actor(size_t thread_count = std::thread::hardware_concurrency()) {
-            _messages.reserve(thread_count);
+        explicit Worker_Pool__Actor(size_t thread_count) {
+            if (thread_count == 0) thread_count = 1;
+
+            _mailboxs.resize(thread_count);
             _actor_refs.reserve(thread_count);
-            for (size_t i = 0; i < thread_count; ++i) {
-                _messages.emplace_back();
-                _actor_refs.emplace_back(i, &_messages);
-            }
             for (size_t i = 0; i < thread_count; ++i)
-                _threads.emplace_back([this, i] { worker_loop(i); });
+                _actor_refs.emplace_back(i, &_mailboxs);
+            for (size_t i = 0; i < thread_count; ++i)
+                _workers.emplace_back([this, i] { worker_loop(i); });
         }
 
         ~Worker_Pool__Actor() {
-            if (_running) shutdown();
+            shutdown();
         }
 
-        inline void submit(func_t message) override {
-            size_t id = _next.fetch_add(1, std::memory_order_relaxed) % _messages.size();
-            _messages[id].push(std::move(message));
+        inline Actor_Ref get_actor_ref(size_t i) const {
+            return _actor_refs[i];
         }
 
-        inline void shutdown() override {
-            if (bool expected{true}; !_running.compare_exchange_strong(expected, false))
+        template <typename F>
+            requires std::invocable<F, Actor_Ref>
+        inline void submit(F&& f) {
+            size_t id = _next.fetch_add(1, std::memory_order_relaxed) % _mailboxs.size();
+            _mailboxs[id].push(msg_t([job = std::forward<F>(f)](Actor_Ref self) { job(self); }));
+        }
+
+        inline void shutdown() {
+            bool expected = true;
+            if (!_running.compare_exchange_strong(expected, false))
                 return;
-            for (auto& t : _threads) t.join();
+            for (auto& t : _workers) if (t.joinable()) t.join();
         }
 
     private:
 
-        inline void worker_loop(size_t id) {
-            Actor_Ref self = _actor_refs[id];
-            while (_running.load()) {
-                auto msg = _messages[id].try_pop();
+        inline void worker_loop(size_t id_self) {
+            Actor_Ref self = _actor_refs[id_self];
+            while (_running.load(std::memory_order_relaxed)) {
+                auto msg = _mailboxs[id_self].try_pop();
                 if (msg) msg.value()(self);
                 else std::this_thread::yield();
             }
         }
-        inline void worker_loop(size_t id) {
-            auto& messages = _messages[id];
-            while (_running.load(std::memory_order_relaxed)) {
-                auto message{ messages.try_pop() };
-                if (message) message.value()();
-                else std::this_thread::yield();
-            }
-        }
 
+        std::vector<mailbox_t> _mailboxs;    
         std::vector<Actor_Ref> _actor_refs;
-        MPSC_queues_t _messages;
-        std::vector<std::thread> _threads;
+        std::vector<std::thread> _workers;
         std::atomic<size_t> _next{0};
         std::atomic<bool> _running{true};
     };
-} // namespace BA_Socket
+}
 
 #endif // WORKER_POOL__ACTOR_HPP
