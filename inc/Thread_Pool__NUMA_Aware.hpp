@@ -1,9 +1,9 @@
-// Worker_Pool__NUMA_Awareh
+// Thread_Pool__NUMA_Awareh
 
 #ifndef WORKER_POOL__NUMA_AWARE_HPP
 #define WORKER_POOL__NUMA_AWARE_HPP
 
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include "Concurrent_Queue_Blocking.hpp"
 #include <thread>
 #include <vector>
@@ -14,10 +14,10 @@
 using namespace BA_Concurrency;
 
 namespace BA_Socket {
-    class Worker_Pool__NUMA_Aware : public IWorker_Pool {
+    class Thread_Pool__NUMA_Aware : public IThread_Pool {
         using job_t = std::function<void()>;
     public:
-        explicit Worker_Pool__NUMA_Aware(size_t thread_count_per_node = 2) {
+        explicit Thread_Pool__NUMA_Aware(size_t thread_count_per_node = 2) {
             size_t nodes = std::thread::hardware_concurrency() / thread_count_per_node;
             if (nodes == 0) nodes = 1;
 
@@ -36,7 +36,7 @@ namespace BA_Socket {
             }
         }
 
-        ~Worker_Pool__NUMA_Aware() {
+        ~Thread_Pool__NUMA_Aware() {
             if (_running) shutdown();
         }
 

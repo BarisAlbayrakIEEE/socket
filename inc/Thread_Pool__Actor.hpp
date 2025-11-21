@@ -1,9 +1,9 @@
-// Worker_Pool__Actor.h
+// Thread_Pool__Actor.h
 
 #ifndef WORKER_POOL__ACTOR_HPP
 #define WORKER_POOL__ACTOR_HPP
 
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include "Concurrent_Queue_LF_Ring_MPSC.hpp"
 #include "socket_setup.hpp"
 #include <vector>
@@ -14,12 +14,12 @@ using namespace BA_Concurrency;
 
 namespace BA_Socket {
     class Actor_Ref;
-    class Worker_Pool__Actor;
+    class Thread_Pool__Actor;
     using msg_t = std::function<void(Actor_Ref)>;
     using mailbox_t = queue_LF_ring_MPSC<msg_t, Capacity_As_Pow2>;
 
     class Actor_Ref {
-        friend class Worker_Pool__Actor;
+        friend class Thread_Pool__Actor;
     public:
         Actor_Ref() : _id(SIZE_MAX), _mailboxs(nullptr) {}
         Actor_Ref(size_t id, std::vector<mailbox_t>* messages) : _id(id), _mailboxs(messages) {}
@@ -46,9 +46,9 @@ namespace BA_Socket {
         std::vector<mailbox_t>* _mailboxs;
     };
 
-    class Worker_Pool__Actor {
+    class Thread_Pool__Actor {
     public:
-        explicit Worker_Pool__Actor(size_t thread_count) {
+        explicit Thread_Pool__Actor(size_t thread_count) {
             if (thread_count == 0) thread_count = 1;
 
             _mailboxs.resize(thread_count);
@@ -59,7 +59,7 @@ namespace BA_Socket {
                 _workers.emplace_back([this, i] { worker_loop(i); });
         }
 
-        ~Worker_Pool__Actor() {
+        ~Thread_Pool__Actor() {
             shutdown();
         }
 

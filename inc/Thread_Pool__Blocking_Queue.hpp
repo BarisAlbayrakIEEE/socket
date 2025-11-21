@@ -1,9 +1,9 @@
-// Worker_Pool__Concurrent_Queue_Blocking.hpp
+// Thread_Pool__Concurrent_Queue_Blocking.hpp
 
 #ifndef WORKER_POOL__BLOCKING_QUEUE_HPP
 #define WORKER_POOL__BLOCKING_QUEUE_HPP
 
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include "Concurrent_Queue_Blocking.hpp"
 #include <vector>
 #include <thread>
@@ -14,17 +14,17 @@
 using namespace BA_Concurrency;
 
 namespace BA_Socket {
-    class Worker_Pool__Concurrent_Queue_Blocking : public IWorker_Pool {
+    class Thread_Pool__Concurrent_Queue_Blocking : public IThread_Pool {
         using func_t = std::function<void()>;
     public:
-        explicit Worker_Pool__Concurrent_Queue_Blocking(
+        explicit Thread_Pool__Concurrent_Queue_Blocking(
             size_t thread_count = std::thread::hardware_concurrency())
         {
             for (size_t i = 0; i < thread_count; ++i)
                 _threads.emplace_back([this] { worker_loop(); });
         }
 
-        ~Worker_Pool__Concurrent_Queue_Blocking() {
+        ~Thread_Pool__Concurrent_Queue_Blocking() {
             if (_running) shutdown();
         }
 

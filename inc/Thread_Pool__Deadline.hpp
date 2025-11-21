@@ -1,9 +1,9 @@
-// Worker_Pool__Deadlineh
+// Thread_Pool__Deadlineh
 
 #ifndef WORKER_POOL__DEADLINE_HPP
 #define WORKER_POOL__DEADLINE_HPP
 
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include <queue>
 #include <mutex>
 #include <condition_variable>
@@ -12,7 +12,7 @@
 #include <atomic>
 
 namespace BA_Socket {
-    class Worker_Pool__Deadline : public IWorker_Pool {
+    class Thread_Pool__Deadline : public IThread_Pool {
         using job_t = std::function<void()>;
 
         struct Deadline_Job {
@@ -26,14 +26,14 @@ namespace BA_Socket {
 
     public:
 
-        explicit Worker_Pool__Deadline(
+        explicit Thread_Pool__Deadline(
             size_t thread_count = std::thread::hardware_concurrency())
         {
             for (size_t i = 0; i < thread_count; ++i)
                 _threads.emplace_back([this] { worker_loop(); });
         }
 
-        ~Worker_Pool__Deadline() {
+        ~Thread_Pool__Deadline() {
             if (_running) shutdown();
         }
 

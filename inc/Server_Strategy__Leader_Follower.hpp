@@ -5,7 +5,7 @@
 
 #include "IServer_Strategy.hpp"
 #include "IEvent_Loop.hpp"
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include <mutex>
 #include <condition_variable>
 #include <queue>
@@ -14,7 +14,7 @@
 namespace BA_Socket {
     class Server_Strategy__Leader_Follower : public IServer_Strategy {
     public:
-        Server_Strategy__Leader_Follower(IEvent_Loop& loop, IWorker_Pool& pool)
+        Server_Strategy__Leader_Follower(IEvent_Loop& loop, IThread_Pool& pool)
             : _loop(loop), _pool(pool), _running(false) {}
 
         inline void start() override {
@@ -75,7 +75,7 @@ namespace BA_Socket {
         }
 
         IEvent_Loop& _loop;
-        IWorker_Pool& _pool;
+        IThread_Pool& _pool;
         std::mutex _leader_mtx;
         std::atomic<bool> _running;
         bool _is_leader = false;

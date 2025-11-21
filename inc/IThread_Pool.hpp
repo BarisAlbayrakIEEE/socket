@@ -1,4 +1,4 @@
-// IWorker_Pool.hpp
+// IThread_Pool.hpp
 
 #ifndef IWORKER_POOL_HPP
 #define IWORKER_POOL_HPP
@@ -6,9 +6,9 @@
 #include <functional>
 
 namespace BA_Socket {
-    class IWorker_Pool {
+    class IThread_Pool {
     public:
-        virtual ~IWorker_Pool() = default;
+        virtual ~IThread_Pool() = default;
 
         virtual void submit(std::function<void()> job) = 0;
         virtual void shutdown() = 0;

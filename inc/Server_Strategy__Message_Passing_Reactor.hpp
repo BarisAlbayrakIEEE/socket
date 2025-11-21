@@ -5,7 +5,7 @@
 
 #include "IServer_Strategy.hpp"
 #include "IEvent_Loop.hpp"
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include "IMessage_Queue.hpp"
 #include <stop_token>
 #include <thread>
@@ -28,7 +28,7 @@ namespace BA_Socket {
     public:
         Server_Strategy__Message_Passing_Reactor(
             IEvent_Loop& loop,
-            IWorker_Pool& pool,
+            IThread_Pool& pool,
             IMessage_Queue<WorkerJob>& to_workers,
             IMessage_Queue<IoJob>& to_Io)
             : _loop(loop), _pool(pool), _to_workers(to_workers), _to_Io(to_Io) {}
@@ -71,7 +71,7 @@ namespace BA_Socket {
 
     private:
         IEvent_Loop& _loop;
-        IWorker_Pool& _pool;
+        IThread_Pool& _pool;
         IMessage_Queue<WorkerJob>& _to_workers;
         IMessage_Queue<IoJob>& _to_Io;
         std::jthread _worker_poller;

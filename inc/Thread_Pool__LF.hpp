@@ -1,9 +1,9 @@
-// Worker_Pool__LFh
+// Thread_Pool__LFh
 
 #ifndef WORKER_POOL__LF_HPP
 #define WORKER_POOL__LF_HPP
 
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include "Concurrent_Queue_LF_Ring_MPMC.hpp"
 #include "socket_setup.hpp"
 #include <vector>
@@ -13,10 +13,10 @@
 using namespace BA_Concurrency;
 
 namespace BA_Socket {
-    class Worker_Pool__LF : public IWorker_Pool {
+    class Thread_Pool__LF : public IThread_Pool {
         using job_t = std::function<void()>;
     public:
-        explicit Worker_Pool__LF(
+        explicit Thread_Pool__LF(
             size_t thread_count = std::thread::hardware_concurrency())
         {
             for (size_t i = 0; i < thread_count; ++i) {
@@ -33,7 +33,7 @@ namespace BA_Socket {
             }
         }
 
-        ~Worker_Pool__LF() {
+        ~Thread_Pool__LF() {
             if (_running) shutdown();
         }
 

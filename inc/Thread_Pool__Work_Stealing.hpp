@@ -1,9 +1,9 @@
-// Worker_Pool__Work_Stealing.hpp
+// Thread_Pool__Work_Stealing.hpp
 
 #ifndef WORKER_POOL__WORK_STEALING_HPP
 #define WORKER_POOL__WORK_STEALING_HPP
 
-#include "IWorker_Pool.hpp"
+#include "IThread_Pool.hpp"
 #include <deque>
 #include <mutex>
 #include <thread>
@@ -13,7 +13,7 @@
 #include <optional>
 
 namespace BA_Socket {
-    class Worker_Pool__Work_Stealing : public IWorker_Pool {
+    class Thread_Pool__Work_Stealing : public IThread_Pool {
         using job_t = std::function<void()>;
 
         struct Job_Deque {
@@ -23,7 +23,7 @@ namespace BA_Socket {
 
     public:
 
-        Worker_Pool__Work_Stealing(
+        Thread_Pool__Work_Stealing(
             size_t thread_count = std::thread::hardware_concurrency())
             : _jds(thread_count)
         {
@@ -31,7 +31,7 @@ namespace BA_Socket {
                 _threads.emplace_back([this, i] { worker_loop(i); });
         }
 
-        ~Worker_Pool__Work_Stealing() {
+        ~Thread_Pool__Work_Stealing() {
             if (_running) shutdown();
         }
 
