@@ -123,7 +123,6 @@ namespace BA_Socket {
 
     private:
 
-        Callback _on_read, _on_write;
         fd_set _fds_read;
         fd_set _fds_write;
         int _fd_max = -1;
