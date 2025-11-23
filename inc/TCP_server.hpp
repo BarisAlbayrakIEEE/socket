@@ -69,6 +69,7 @@ namespace BA_Socket {
                         FD_CLR(fd, &master);
                         CLOSE_SOCKET(fd);
                         if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
+                        SOCKET_ERROR__RECV();
                         continue;
                     }
                     PRINTF4("[Server]: Received (%d bytes): %.*s", bytes_received, bytes_received, read);
