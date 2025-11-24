@@ -10,9 +10,10 @@
 #include <atomic>
 
 namespace BA_Socket {
+    template <typename Handler_Type>
     class Event_Loop__Select : public IEvent_Loop {
     public:
-        Event_Loop__Select(Callback on_read, Callback on_write)
+        Event_Loop__Select(Handler_Type on_read, Handler_Type on_write)
             : _on_read(on_read), _on_write(on_write)
         {
             FD_ZERO(&_fds_read);
@@ -52,40 +53,25 @@ namespace BA_Socket {
 
                 fd_set fds_read = _fds_read;
                 fd_set fds_write = _fds_write;
-                if (::select(
-                    _fd_max + 1,
-                    &fds_read,
-                    &fds_write,
-                    nullptr,
-                    nullptr) < 0)
-                {
+                if (::select(_fd_max + 1, &fds_read, &fds_write, nullptr, nullptr) < 0) {
                     if (GET_SOCKET_ERRNO() == EINTR) continue;
                     SOCKET_ERROR__SELECT();
                 }
                 for(SOCKET fd = 0; fd <= _fd_max; ++fd) {
                     if (FD_ISSET(fd, &fds_read)) {
-                        auto rcp = _on_read(fd);
-                        apply_rcp(rcp);
+                        auto fd_actions = _on_read(fd);
+                        apply_fd_action(fd_actions);
                     }
                     if (FD_ISSET(fd, &fds_write)) {
-                        auto rcp = _on_write(fd);
-                        apply_rcp(rcp);
+                        auto fd_actions = _on_write(fd);
+                        apply_fd_action(fd_actions);
                     }
                 }
             }
-            stop();
         }
 
         inline void stop() override {
             _running.store(false);
-            for (SOCKET fd = 0; fd <= _fd_max; ++fd) {
-                if (FD_ISSET(fd, &_fds_read)) {
-                    CLOSE_SOCKET(fd);
-                }
-                if (FD_ISSET(fd, &_fds_write)) {
-                    CLOSE_SOCKET(fd);
-                }
-            }
         }
 
         inline void close_sockets() override {
@@ -99,21 +85,16 @@ namespace BA_Socket {
             }
         }
 
-        inline void apply_rcp(const Reactor_Command_Pack& rcp) {
-            for (const auto& rc : rcp._rcs) {
-                switch (rc.first) {
-                case Enum_Reactor_Command_Types::RegisterRead:
-                    fd_register(rc.second, Enum_Event_Types::Read);
+        inline void apply_fd_action(const std::vector<fd_Action>& fd_actions) {
+            for (const auto& fd_action : fd_actions) {
+                switch (fd_action._type) {
+                case Enum_fd_Action_Types::Register_Read:
+                    fd_register(fd_action._fd, Enum_Event_Types::Read);
                     break;
-                case Enum_Reactor_Command_Types::RegisterWrite:
-                    fd_register(rc.second, Enum_Event_Types::Write);
+                case Enum_fd_Action_Types::Register_Write:
+                    fd_register(fd_action._fd, Enum_Event_Types::Write);
                     break;
-                case Enum_Reactor_Command_Types::Unregister:
-                    fd_unregister(rc.second);
-                    break;
-                case Enum_Reactor_Command_Types::Error:
-                    break;
-                case Enum_Reactor_Command_Types::eintr:
+                case Enum_fd_Action_Types::None:
                     break;
                 default:
                     break;
@@ -123,6 +104,8 @@ namespace BA_Socket {
 
     private:
 
+        Handler_Type _on_read;
+        Handler_Type _on_write;
         fd_set _fds_read;
         fd_set _fds_write;
         int _fd_max = -1;
