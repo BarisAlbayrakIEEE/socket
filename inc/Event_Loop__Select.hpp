@@ -13,31 +13,31 @@ namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
     public:
         Event_Loop__Select() {
-            FD_ZERO(&_fds_read);
-            FD_ZERO(&_fds_write);
+            FD_ZERO(&_fd_set_read);
+            FD_ZERO(&_fd_set_write);
         }
 
         inline void fd_register(int fd, Enum_Event_Types event_type) override {
             if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Read) {
-                FD_SET(fd, &_fds_read);
+                FD_SET(fd, &_fd_set_read);
             }
             if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Write) {
-                FD_SET(fd, &_fds_write);
+                FD_SET(fd, &_fd_set_write);
             }
             if (fd > _fd_max) _fd_max = fd;
         }
 
         inline void fd_unregister(int fd, Enum_Event_Types event_type) override {
             if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Read) {
-                FD_CLR(fd, &_fds_read);
+                FD_CLR(fd, &_fd_set_read);
             }
             if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Write) {
-                FD_CLR(fd, &_fds_write);
+                FD_CLR(fd, &_fd_set_write);
             }
             if (fd == _fd_max) {
                 if (
-                    (event_type == Enum_Event_Types::Read && FD_ISSET(fd, &_fds_write)) ||
-                    (event_type == Enum_Event_Types::Write && FD_ISSET(fd, &_fds_read)))
+                    (event_type == Enum_Event_Types::Read && FD_ISSET(fd, &_fd_set_write)) ||
+                    (event_type == Enum_Event_Types::Write && FD_ISSET(fd, &_fd_set_read)))
                 {
                     return;
                 }
@@ -45,10 +45,10 @@ namespace BA_Socket {
                 auto fd_max = _fd_max;
                 _fd_max = -1;
                 for(SOCKET fd = 0; fd <= fd_max; ++fd) {
-                    if (FD_ISSET(fd, &_fds_read)) {
+                    if (FD_ISSET(fd, &_fd_set_read)) {
                         if (fd > _fd_max) _fd_max = fd;
                     }
-                    if (FD_ISSET(fd, &_fds_write)) {
+                    if (FD_ISSET(fd, &_fd_set_write)) {
                         if (fd > _fd_max) _fd_max = fd;
                     }
                 }
@@ -61,9 +61,9 @@ namespace BA_Socket {
                 if (_fd_max < 0) break;
 
                 // perform select operation
-                fd_set fds_read = _fds_read;
-                fd_set fds_write = _fds_write;
-                if (::select(_fd_max + 1, &fds_read, &fds_write, nullptr, nullptr) < 0) {
+                fd_set fd_set_read = _fd_set_read;
+                fd_set fd_set_write = _fd_set_write;
+                if (::select(_fd_max + 1, &fd_set_read, &fd_set_write, nullptr, nullptr) < 0) {
                     if (GET_SOCKET_ERRNO() == EINTR) continue;
                     SOCKET_ERROR__SELECT();
                 }
@@ -79,7 +79,12 @@ namespace BA_Socket {
                     if (!handler) continue;
 
                     // execute the handler
-                    auto handler_return = handler->apply(fd);
+                    handler_return_t handler_return;
+                    if (FD_ISSET(fd, &_fd_set_read)) 
+                        handler_return = handler->on_read(fd);
+                    else if (FD_ISSET(fd, &_fd_set_write)) 
+                        handler_return = handler->on_write(fd);
+                    else continue;
                     auto fd_set_actions = std::move(handler_return.first);
                     auto handler_action = std::move(handler_return.second);
 
@@ -126,10 +131,10 @@ namespace BA_Socket {
 
         inline void close_sockets() override {
             for (SOCKET fd = 0; fd <= _fd_max; ++fd) {
-                if (FD_ISSET(fd, &_fds_read)) {
+                if (FD_ISSET(fd, &_fd_set_read)) {
                     CLOSE_SOCKET(fd);
                 }
-                if (FD_ISSET(fd, &_fds_write)) {
+                if (FD_ISSET(fd, &_fd_set_write)) {
                     CLOSE_SOCKET(fd);
                 }
             }
@@ -137,8 +142,8 @@ namespace BA_Socket {
 
     private:
         std::unordered_map<int, std::unique_ptr<IHandler>> _handlers;
-        fd_set _fds_read;
-        fd_set _fds_write;
+        fd_set _fd_set_read;
+        fd_set _fd_set_write;
         int _fd_max = -1;
         std::atomic<bool> _running{false};
     };

@@ -15,7 +15,7 @@ namespace BA_Socket {
     enum class Enum_Event_Types { None, Read, Write, Read_Write }; // Read_Write is for unregistering from both read and write
     enum class Enum_Handler_Action_Types { None, Add, Remove, Replace };
 
-    const std::string INFO_WRONG_DATA = "Wrong data for the request";
+   const std::string INFO_WRONG_DATA = "Wrong data for the request";
 
     struct fd_set_Action{
         int _fd{-1};
@@ -38,7 +38,25 @@ namespace BA_Socket {
 
     // Handler interface
     struct IHandler {
-        virtual handler_return_t apply(int) const = 0;
+        virtual ~IHandler() = default;
+        virtual inline handler_return_t on_read(int) const {
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        -1,
+                        Enum_Register_Types::None,
+                        Enum_Event_Types::None) },
+                handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+        };
+        virtual inline handler_return_t on_write(int) const {
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        -1,
+                        Enum_Register_Types::None,
+                        Enum_Event_Types::None) },
+                handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+        };
     };
 
     // Write handler
@@ -52,7 +70,10 @@ namespace BA_Socket {
     struct Handler_Write : public IHandler {
         std::string _buffer{};
 
-        handler_return_t apply(int fd) const {
+        explicit Handler_Write(const std::string& buffer) : _buffer(buffer) {};
+        explicit Handler_Write(std::string&& buffer) : _buffer(std::move(buffer)) {};
+
+        handler_return_t on_write(int fd) const override {
             // send the data to the peer
             PRINTF1("[Server]: Sending the data to the peer...\n");
             ::send(fd, _buffer.c_str(), _buffer.size(), 0);
@@ -83,7 +104,7 @@ namespace BA_Socket {
     template <typename Next_Handler_Type>
         requires std::is_base_of_v<IHandler, Next_Handler_Type>
     struct Handler_Accept : public IHandler {
-        handler_return_t apply(int fd) const override {
+        handler_return_t on_read(int fd) const override {
             // accept a new connection
             PRINTF1("[Server]: Accepting a new connection...\n");
             fflush(stdout);
@@ -132,7 +153,10 @@ namespace BA_Socket {
     struct Handler_Accept<Handler_Write> : public IHandler {
         std::string _buffer{};
 
-        handler_return_t apply(int fd) const override {
+        explicit Handler_Accept(const std::string& buffer) : _buffer(buffer) {};
+        explicit Handler_Accept(std::string&& buffer) : _buffer(std::move(buffer)) {};
+
+        handler_return_t on_read(int fd) const override {
             // accept a new connection
             PRINTF1("[Server]: Accepting a new connection...\n");
             fflush(stdout);
@@ -178,7 +202,12 @@ namespace BA_Socket {
         std::string _buffer{};
         std::vector<int> _fds;
 
-        handler_return_t apply(int fd) const {
+        Handler_Redirect(const std::string& buffer, const std::vector<int>& fds)
+            : _buffer(buffer), _fds(fds) {};
+        Handler_Redirect(std::string&& buffer, std::vector<int>&& fds)
+            : _buffer(std::move(buffer)), _fds(std::move(fds)) {};
+
+        inline handler_return_t on_write(int fd) const override {
             // send the data to the peer
             PRINTF1("[Server]: Sending the data to the peer...\n");
             for (const auto& fd_: _fds) {
@@ -209,7 +238,7 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Forward<F>
     struct Handler_Read_Forward : public IHandler {
-        handler_return_t apply(int fd) const {
+        handler_return_t n_read(int fd) const override {
             // receive data from the peer
             char read[1024];
             int bytes_received = ::recv(fd, read, 1024, 0);
@@ -266,7 +295,10 @@ namespace BA_Socket {
     struct Handler_Read_Redirect : public IHandler {
         std::vector<int> _fds;
 
-        handler_return_t apply(int fd) const {
+        explicit Handler_Read_Redirect(const std::vector<int>& fds) : _fds(fds) {};
+        explicit Handler_Read_Redirect(std::vector<int>&& fds) : _fds(std::move(fds)) {};
+
+        handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
             int bytes_received = ::recv(fd, read, 1024, 0);
@@ -322,7 +354,7 @@ namespace BA_Socket {
                 std::is_same_v<Next_Handler_Type, Handler_Write> ||
                 std::is_same_v<Next_Handler_Type, Handler_Redirect>)
     struct Handler_Read_Transform : public IHandler {
-        handler_return_t apply(int fd) const {
+        handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
             int bytes_received = ::recv(fd, read, 1024, 0);
@@ -383,7 +415,10 @@ namespace BA_Socket {
     struct Handler_Read_Transform<F, Handler_Redirect> : public IHandler {
         std::vector<int> _fds;
 
-        handler_return_t apply(int fd) const {
+        explicit Handler_Read_Transform(const std::vector<int>& fds) : _fds(fds) {};
+        explicit Handler_Read_Transform(std::vector<int>&& fds) : _fds(std::move(fds)) {};
+
+        handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
             int bytes_received = ::recv(fd, read, 1024, 0);
@@ -443,7 +478,7 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform_Write : public IHandler {
-        handler_return_t apply(int fd) const {
+        handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
             int bytes_received = ::recv(fd, read, 1024, 0);
@@ -510,7 +545,10 @@ namespace BA_Socket {
     struct Handler_Read_Transform_Redirect : public IHandler {
         std::vector<int> _fds;
 
-        handler_return_t apply(int fd) const {
+        explicit Handler_Read_Transform_Redirect(const std::vector<int>& fds) : _fds(fds) {};
+        explicit Handler_Read_Transform_Redirect(std::vector<int>&& fds) : _fds(std::move(fds)) {};
+
+        handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
             int bytes_received = ::recv(fd, read, 1024, 0);
