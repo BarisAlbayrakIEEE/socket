@@ -13,7 +13,7 @@
 namespace BA_Socket {
     enum class Enum_Register_Types { None, Register, Unregister };
     enum class Enum_Event_Types { None, Read, Write, Read_Write }; // Read_Write is for unregistering from both read and write
-    enum class Enum_Handler_Action_Types { None, Add };
+    enum class Enum_Handler_Action_Types { None, Add, Remove, Replace };
 
     const std::string INFO_WRONG_DATA = "Wrong data for the request";
 
@@ -56,7 +56,7 @@ namespace BA_Socket {
             // send the data to the peer
             PRINTF1("[Server]: Sending the data to the peer...\n");
             ::send(fd, _buffer.c_str(), _buffer.size(), 0);
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), read);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.c_str(), _buffer.size(), read);
 
             // return the fd_set actions and the handler action
             return handler_return_t(
@@ -82,7 +82,7 @@ namespace BA_Socket {
     //   Next handler type shall be one of read handlers (e.g. read-forward).
     template <typename Next_Handler_Type>
         requires std::is_base_of_v<IHandler, Next_Handler_Type>
-    struct Handler_Accept : IHandler {
+    struct Handler_Accept : public IHandler {
         handler_return_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Server]: Accepting a new connection...\n");
@@ -93,7 +93,7 @@ namespace BA_Socket {
                 fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
-            if (!IS_VALID_SOCKET(fd)) {
+            if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
                 return handler_return_t(
                     fd_set_actions_t{
@@ -129,7 +129,7 @@ namespace BA_Socket {
     // Handler action:
     //   Adds a new Handler_Write.
     template <>
-    struct Handler_Accept<Handler_Write> : IHandler {
+    struct Handler_Accept<Handler_Write> : public IHandler {
         std::string _buffer{};
 
         handler_return_t apply(int fd) const override {
@@ -174,7 +174,7 @@ namespace BA_Socket {
     //
     // Handler action:
     //   None
-    struct Handler_Redirect {
+    struct Handler_Redirect : public IHandler {
         std::string _buffer{};
         std::vector<int> _fds;
 
@@ -208,7 +208,7 @@ namespace BA_Socket {
     //   None
     template <typename F>
         requires CString_Forward<F>
-    struct Handler_Read_Forward {
+    struct Handler_Read_Forward : public IHandler {
         handler_return_t apply(int fd) const {
             // receive data from the peer
             char read[1024];
@@ -229,7 +229,7 @@ namespace BA_Socket {
 
             // forward the recieved data to function F
             PRINTF1("[Server]: Forwarding the recieved data to function F...\n");
-            std::string buffer{ read };
+            std::string buffer{ read, static_cast<size_t>(bytes_received) };
             if(!F(buffer)) {
                 // send the info for the failed forwarding (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed forwarding (wrong input data) to the peer...\n");
@@ -263,7 +263,7 @@ namespace BA_Socket {
     //
     // Handler action:
     //   None
-    struct Handler_Read_Redirect {
+    struct Handler_Read_Redirect : public IHandler {
         std::vector<int> _fds;
 
         handler_return_t apply(int fd) const {
@@ -286,7 +286,7 @@ namespace BA_Socket {
 
             // redirect the data to the contained fds
             PRINTF1("[Server]: Redirecting the data to the ...\n");
-            std::string buffer{ read };
+            std::string buffer{ read, static_cast<size_t>(bytes_received) };
             for (const auto& fd_: _fds) {
                 ::send(fd_, buffer.c_str(), buffer.size(), 0);
             }
@@ -321,7 +321,7 @@ namespace BA_Socket {
             (
                 std::is_same_v<Next_Handler_Type, Handler_Write> ||
                 std::is_same_v<Next_Handler_Type, Handler_Redirect>)
-    struct Handler_Read_Transform {
+    struct Handler_Read_Transform : public IHandler {
         handler_return_t apply(int fd) const {
             // receive data from the peer
             char read[1024];
@@ -342,7 +342,7 @@ namespace BA_Socket {
 
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
-            std::string buffer{ read };
+            std::string buffer{ read, static_cast<size_t>(bytes_received) };
             if(!F(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
@@ -380,7 +380,7 @@ namespace BA_Socket {
     //   Adds a new Handler_Write.
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform<F, Handler_Redirect> {
+    struct Handler_Read_Transform<F, Handler_Redirect> : public IHandler {
         std::vector<int> _fds;
 
         handler_return_t apply(int fd) const {
@@ -403,7 +403,7 @@ namespace BA_Socket {
 
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
-            std::string buffer{ read };
+            std::string buffer{ read, static_cast<size_t>(bytes_received) };
             if(!F(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
@@ -442,7 +442,7 @@ namespace BA_Socket {
     //   None
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform_Write {
+    struct Handler_Read_Transform_Write : public IHandler {
         handler_return_t apply(int fd) const {
             // receive data from the peer
             char read[1024];
@@ -463,7 +463,7 @@ namespace BA_Socket {
 
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
-            std::string buffer{ read };
+            std::string buffer{ read, static_cast<size_t>(bytes_received) };
             if(!F(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
@@ -479,8 +479,8 @@ namespace BA_Socket {
 
             // send the transformed data back to the peer
             PRINTF1("[Server]: Sending the transformed data back to the peer...\n");
-            ::send(fd, buffer.c_str(), bytes_received, 0);
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", bytes_received, bytes_received, read);
+            ::send(fd, buffer.c_str(), buffer.size(), 0);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), read);
 
             // return the fd_set actions and the handler action
             return handler_return_t(
@@ -507,7 +507,7 @@ namespace BA_Socket {
     //   None
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform_Redirect {
+    struct Handler_Read_Transform_Redirect : public IHandler {
         std::vector<int> _fds;
 
         handler_return_t apply(int fd) const {
@@ -530,7 +530,7 @@ namespace BA_Socket {
 
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
-            std::string buffer{ read };
+            std::string buffer{ read, static_cast<size_t>(bytes_received) };
             if(!F(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");

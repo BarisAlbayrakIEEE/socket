@@ -18,9 +18,10 @@ namespace BA_Socket {
         }
 
         inline void fd_register(int fd, Enum_Event_Types event_type) override {
-            if (event_type == Enum_Event_Types::Read) {
+            if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Read) {
                 FD_SET(fd, &_fds_read);
-            } else {
+            }
+            if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Write) {
                 FD_SET(fd, &_fds_write);
             }
             if (fd > _fd_max) _fd_max = fd;
@@ -31,7 +32,7 @@ namespace BA_Socket {
                 FD_CLR(fd, &_fds_read);
             }
             if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Write) {
-                FD_CLR(fd, &_fds_read);
+                FD_CLR(fd, &_fds_write);
             }
             if (fd == _fd_max) {
                 if (
@@ -59,6 +60,7 @@ namespace BA_Socket {
             while (_running.load()) {
                 if (_fd_max < 0) break;
 
+                // perform select operation
                 fd_set fds_read = _fds_read;
                 fd_set fds_write = _fds_write;
                 if (::select(_fd_max + 1, &fds_read, &fds_write, nullptr, nullptr) < 0) {
@@ -66,13 +68,22 @@ namespace BA_Socket {
                     SOCKET_ERROR__SELECT();
                 }
 
-                std::unordered_map<int, std::pair<bool, std::unique_ptr<IHandler>>> handler_actions;
+                // initialize a new map to collect the new handlers
+                // those should be added to or removed from _handlers
+                //   true: handler to be added
+                //   false: handler to be removed
+                std::unordered_map<int, std::pair<bool, std::unique_ptr<IHandler>>> new_handler_actions;
+
+                // execute _handlers
                 for (auto& [fd, handler] : _handlers) {
                     if (!handler) continue;
 
+                    // execute the handler
                     auto handler_return = handler->apply(fd);
                     auto fd_set_actions = std::move(handler_return.first);
-                    auto handler_actions = std::move(handler_return.second);
+                    auto handler_action = std::move(handler_return.second);
+
+                    // loop through the fd_set actions reulted from the handler
                     for (const auto& fd_set_action : fd_set_actions) {
                         if (fd_set_action._register_type == Enum_Register_Types::Register) {
                             fd_register(fd_set_action._fd, fd_set_action._event_type);
@@ -80,15 +91,34 @@ namespace BA_Socket {
                         else if (fd_set_action._register_type == Enum_Register_Types::Unregister) {
                             fd_unregister(fd_set_action._fd, fd_set_action._event_type);
                         }
-                        if ()
-                        
+                    }
+                    
+                    // perform the handler action resulted from the handler:
+                    //   collect the handlers those should be added to or removed from _handlers
+                    if(handler_action.first == Enum_Handler_Action_Types::None) continue;
+                    if(handler_action.first == Enum_Handler_Action_Types::Add) {
+                        new_handler_actions[fd] = { true, std::move(handler_action.second) };
+                    }
+                    else if(handler_action.first == Enum_Handler_Action_Types::Remove) {
+                        new_handler_actions[fd] = { false, std::move(handler_action.second) };
+                    }
+                    else { // if(handler_action.first == Enum_Handler_Action_Types::Replace) {
+                        new_handler_actions[fd] = { true, std::move(handler_action.second) };
+                    }
+                }
+
+                // update _handlers by the collected handlers
+                // those should be added to or removed from _handlers
+                for (auto& [fd, handler_action_pair] : new_handler_actions) {
+                    if(handler_action_pair.first) {
+                        _handlers[fd] = std::move(handler_action_pair.second);
+                    }
+                    else {
+                        _handlers.erase(fd);
                     }
                 }
             }
         }
-    using fd_set_actions_t = std::vector<fd_set_Action>;
-    using handler_action_t = std::pair<Enum_Handler_Action_Types, std::unique_ptr<IHandler>>;
-    using handler_return_t = std::pair<fd_set_actions_t, handler_action_t>;
 
         inline void stop() override {
             _running.store(false);
@@ -101,23 +131,6 @@ namespace BA_Socket {
                 }
                 if (FD_ISSET(fd, &_fds_write)) {
                     CLOSE_SOCKET(fd);
-                }
-            }
-        }
-
-        inline void apply_fd_action(const std::vector<fd_Action>& fd_actions) {
-            for (const auto& fd_action : fd_actions) {
-                switch (fd_action._type) {
-                case Enum_fd_Action_Types::Register_Read:
-                    fd_register(fd_action._fd, Enum_Event_Types::Read);
-                    break;
-                case Enum_fd_Action_Types::Register_Write:
-                    fd_register(fd_action._fd, Enum_Event_Types::Write);
-                    break;
-                case Enum_fd_Action_Types::None:
-                    break;
-                default:
-                    break;
                 }
             }
         }
