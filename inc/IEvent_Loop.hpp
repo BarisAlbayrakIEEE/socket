@@ -12,8 +12,8 @@
 
 namespace BA_Socket {
     enum class Enum_Register_Types { None, Register, Unregister };
-    enum class Enum_Event_Types { None, Read, Write };
-    enum class Enum_Handler_Action_Types { None, Add, Remove, Replace };
+    enum class Enum_Event_Types { None, Read, Write, Read_Write }; // Read_Write is for unregistering from both read and write
+    enum class Enum_Handler_Action_Types { None, Add };
 
     const std::string INFO_WRONG_DATA = "Wrong data for the request";
 
@@ -28,14 +28,60 @@ namespace BA_Socket {
     using handler_action_t = std::pair<Enum_Handler_Action_Types, std::unique_ptr<IHandler>>;
     using handler_return_t = std::pair<fd_set_actions_t, handler_action_t>;
 
+    template <typename F>
+    concept CString_Forward = 
+        requires (F f, const std::string& s) { { f(s) } -> std::same_as<bool>; };
+
+    template <typename F>
+    concept CString_Transform = 
+        requires (F f, std::string& s) { { f(s) } -> std::same_as<bool>; };
+
+    // Handler interface
     struct IHandler {
         virtual handler_return_t apply(int) const = 0;
     };
 
-    // accept handler
-    // registers the client fd to the read fd_set
-    template <typename New_Handler_Type>
-        requires std::is_base_of_v<IHandler, New_Handler_Type>
+    // Write handler
+    //
+    // fd_set actions:
+    //   Unregisters the fd from the write fd_set.
+    //   New read will register the fd again.
+    //
+    // Handler action:
+    //   Removes the handler from the handler map.
+    struct Handler_Write : public IHandler {
+        std::string _buffer{};
+
+        handler_return_t apply(int fd) const {
+            // send the data to the peer
+            PRINTF1("[Server]: Sending the data to the peer...\n");
+            ::send(fd, _buffer.c_str(), _buffer.size(), 0);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), read);
+
+            // return the fd_set actions and the handler action
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        -1,
+                        Enum_Register_Types::None,
+                        Enum_Event_Types::None) },
+                handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+        };
+    };
+
+    // Accept handler
+    //
+    // Base template: Followed by a one of read handlers.
+    // Will be specialized for the case that is followed by a write handler.
+    //
+    // fd_set actions:
+    //   Registers the client fd to the read fd_set.
+    //
+    // Handler action:
+    //   Adds a new handler of type Next_Handler_Type.
+    //   Next handler type shall be one of read handlers (e.g. read-forward).
+    template <typename Next_Handler_Type>
+        requires std::is_base_of_v<IHandler, Next_Handler_Type>
     struct Handler_Accept : IHandler {
         handler_return_t apply(int fd) const override {
             // accept a new connection
@@ -59,7 +105,7 @@ namespace BA_Socket {
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
@@ -68,36 +114,66 @@ namespace BA_Socket {
                         Enum_Event_Types::Read) },
                 handler_action_t(
                     Enum_Handler_Action_Types::Add,
-                    std::make_unique<New_Handler_Type>()));
+                    std::make_unique<Next_Handler_Type>()));
         };
     };
 
-    // write handler
-    // unregisters the fd from the write fd_set.
-    // new read will register the fd again.
-    struct Handler_Write {
+    // Accept handler
+    //
+    // Specialization for: Followed by a write handler.
+    // Will be specialized for the case that is followed by a write handler.
+    //
+    // fd_set actions:
+    //   Registers the client fd to the write fd_set.
+    //
+    // Handler action:
+    //   Adds a new Handler_Write.
+    template <>
+    struct Handler_Accept<Handler_Write> : IHandler {
         std::string _buffer{};
 
-        handler_return_t apply(int fd) const {
-            // send the data to the peer
-            PRINTF1("[Server]: Sending the data to the peer...\n");
-            ::send(fd, _buffer.c_str(), _buffer.size(), 0);
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), read);
+        handler_return_t apply(int fd) const override {
+            // accept a new connection
+            PRINTF1("[Server]: Accepting a new connection...\n");
+            fflush(stdout);
+            struct sockaddr_storage client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            SOCKET fd_client = ::accept(
+                fd,
+                (struct sockaddr*) &client_addr,
+                &client_len);
+            if (!IS_VALID_SOCKET(fd)) {
+                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+            print_sockaddr<is_debug_mode>(client_addr, client_len);
 
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
-                        fd,
-                        Enum_Register_Types::Unregister,
+                        fd_client,
+                        Enum_Register_Types::Register,
                         Enum_Event_Types::Write) },
-                handler_action_t(Enum_Handler_Action_Types::Remove, nullptr));
+                handler_action_t(
+                    Enum_Handler_Action_Types::Add,
+                    std::make_unique<Handler_Write>(_buffer)));
         };
     };
 
-    // redirect handler
-    // unregisters the fd from the write fd_set.
-    // new read will register the fd again.
+    // Redirect handler
+    //
+    // fd_set actions:
+    //   None
+    //
+    // Handler action:
+    //   None
     struct Handler_Redirect {
         std::string _buffer{};
         std::vector<int> _fds;
@@ -110,65 +186,26 @@ namespace BA_Socket {
             }
             PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), read);
 
-            // return the fd set actions and the handler action
-            return handler_return_t(
-                fd_set_actions_t{
-                    fd_set_Action(
-                        fd,
-                        Enum_Register_Types::Unregister,
-                        Enum_Event_Types::Write) },
-                handler_action_t(Enum_Handler_Action_Types::Remove, nullptr));
-        };
-    };
-
-    // transform handler: transforms the buffer recieved before to a function
-    // registers the fd to the write fd_set.
-    // returns a write handler.
-    template <typename F>
-    concept CString_Transform = 
-        requires (F f, std::string& s) { { f(s) } -> std::same_as<bool>; };
-
-    template <typename F>
-        requires CString_Transform<F>
-    struct Handler_Transform {
-        std::string _buffer{};
-
-        handler_return_t apply(int fd) const {
-            // transform the data by function F
-            PRINTF1("[Server]: Transforming the data by function F...\n");
-            if(!F(_buffer)) {
-                // send the info for the failed transformation (wrong input data) to the peer
-                PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
-                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
-                return handler_return_t(
-                    fd_set_actions_t{
-                        fd_set_Action(
-                            -1,
-                            Enum_Register_Types::None,
-                            Enum_Event_Types::None) },
-                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
-            }
-
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
                         -1,
                         Enum_Register_Types::None,
                         Enum_Event_Types::None) },
-                handler_action_t(
-                    Enum_Handler_Action_Types::Replace,
-                    std::make_unique<Handler_Write>(std::move(_buffer))));
+                handler_action_t(Enum_Handler_Action_Types::None, nullptr));
         };
     };
 
-    // read-and-forward handler
-    // does not registers fds to the fd_sets.
-    // does not return new handlers.
-    template <typename F>
-    concept CString_Forward = 
-        requires (F f, const std::string& s) { { f(s) } -> std::same_as<bool>; };
-
+    // Read-Forward handler:
+    //   Recieves the data from the peer
+    //   and sends it to a function (for processing the peer data internally).
+    //
+    // fd_set actions:
+    //   None
+    //
+    // Handler action:
+    //   None
     template <typename F>
         requires CString_Forward<F>
     struct Handler_Read_Forward {
@@ -206,7 +243,7 @@ namespace BA_Socket {
                     handler_action_t(Enum_Handler_Action_Types::None, nullptr));
             }
 
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
@@ -217,10 +254,15 @@ namespace BA_Socket {
         };
     };
 
-    // read-and-redirect handler: recieves the data from the peer
-    // and sends to the sockets with the contained file descriptors.
-    // does not registers fds to the fd_sets.
-    // does not return new handlers.
+    // Read-Redirect handler:
+    //   Recieves the data from the peer
+    //   and sends it to the sockets with the contained file descriptors.
+    //
+    // fd_set actions:
+    //   None
+    //
+    // Handler action:
+    //   None
     struct Handler_Read_Redirect {
         std::vector<int> _fds;
 
@@ -250,7 +292,7 @@ namespace BA_Socket {
             }
             PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), read);
 
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
@@ -261,13 +303,24 @@ namespace BA_Socket {
         };
     };
 
-    // read-and-transform handler
-    // base template when followed by a write handler.
-    // will be specialized when followed by a redirection.
-    // registers the fd to the write fd_set.
-    // returns a write handler.
+    // Read-Transform handler:
+    //   Recieves the data from the peer
+    //   and transforms it for the next action (write or redirect).
+    //
+    // Base template: Followed by a write handler.
+    // Will be specialized for the case that is followed by a redirect handler.
+    //
+    // fd_set actions:
+    //   Registers the fd to the write fd_set.
+    //
+    // Handler action:
+    //   Adds a new Handler_Write.
     template <typename F, typename Next_Handler_Type>
-        requires CString_Transform<F>
+        requires
+            CString_Transform<F> &&
+            (
+                std::is_same_v<Next_Handler_Type, Handler_Write> ||
+                std::is_same_v<Next_Handler_Type, Handler_Redirect>)
     struct Handler_Read_Transform {
         handler_return_t apply(int fd) const {
             // receive data from the peer
@@ -303,7 +356,7 @@ namespace BA_Socket {
                     handler_action_t(Enum_Handler_Action_Types::None, nullptr));
             }
 
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
@@ -316,10 +369,15 @@ namespace BA_Socket {
         };
     };
 
-    // read-and-transform handler
-    // specialization when followed by a redirection.
-    // registers the fd to the write fd_set.
-    // returns a redirect handler.
+    // Read-Transform handler:
+    //   Recieves the data from the peer
+    //   and transforms it for the next action (write or redirect).
+    //
+    // fd_set actions:
+    //   Registers the fd to the write fd_set.
+    //
+    // Handler action:
+    //   Adds a new Handler_Write.
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform<F, Handler_Redirect> {
@@ -359,7 +417,7 @@ namespace BA_Socket {
                     handler_action_t(Enum_Handler_Action_Types::None, nullptr));
             }
 
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
@@ -372,11 +430,81 @@ namespace BA_Socket {
         };
     };
 
-    // read-and-transform-redirect handler: recieves the data from the peer
-    // transforms the recieved data
-    // and sends to the sockets with the contained file descriptors.
-    // does not registers fds to the fd_sets.
-    // does not return new handlers.
+    // Read-Transform-Write handler:
+    //   Recieves the data from the peer,
+    //   transforms it
+    //   and writes back to the peer.
+    //
+    // fd_set actions:
+    //   None
+    //
+    // Handler action:
+    //   None
+    template <typename F>
+        requires CString_Transform<F>
+    struct Handler_Read_Transform_Write {
+        handler_return_t apply(int fd) const {
+            // receive data from the peer
+            char read[1024];
+            int bytes_received = ::recv(fd, read, 1024, 0);
+            PRINTF1("[Server]: Receiving data from peer...\n");
+            if (bytes_received < 1) {
+                CLOSE_SOCKET(fd);
+                SOCKET_ERROR__RECV();
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+            PRINTF4("[Server]: Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+
+            // transform the recieved data by function F
+            PRINTF1("[Server]: Transforming the recieved data by function F...\n");
+            std::string buffer{ read };
+            if(!F(buffer)) {
+                // send the info for the failed transformation (wrong input data) to the peer
+                PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
+                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+
+            // send the transformed data back to the peer
+            PRINTF1("[Server]: Sending the transformed data back to the peer...\n");
+            ::send(fd, buffer.c_str(), bytes_received, 0);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", bytes_received, bytes_received, read);
+
+            // return the fd_set actions and the handler action
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        -1,
+                        Enum_Register_Types::None,
+                        Enum_Event_Types::None) },
+                handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+        };
+    };
+
+    // Read-Transform-Redirect handler:
+    //   Recieves the data from the peer,
+    //   transforms it
+    //   and redirects to the sockets defined as a member.
+    //
+    // Specialization for: Followed by a redirect handler.
+    //
+    // fd_set actions:
+    //   None
+    //
+    // Handler action:
+    //   None
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform_Redirect {
@@ -423,7 +551,7 @@ namespace BA_Socket {
             }
             PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), read);
 
-            // return the fd set actions and the handler action
+            // return the fd_set actions and the handler action
             return handler_return_t(
                 fd_set_actions_t{
                     fd_set_Action(
@@ -434,68 +562,13 @@ namespace BA_Socket {
         };
     };
 
-    // read-and-transform-and-write handler
-    // does not registers fds to the fd_sets.
-    // does not return new handlers.
-    template <typename F>
-        requires CString_Transform<F>
-    struct Handler_Read_Transform_Write {
-        handler_return_t apply(int fd) const {
-            // receive data from the peer
-            char read[1024];
-            int bytes_received = ::recv(fd, read, 1024, 0);
-            PRINTF1("[Server]: Receiving data from peer...\n");
-            if (bytes_received < 1) {
-                CLOSE_SOCKET(fd);
-                SOCKET_ERROR__RECV();
-                return handler_return_t(
-                    fd_set_actions_t{
-                        fd_set_Action(
-                            -1,
-                            Enum_Register_Types::None,
-                            Enum_Event_Types::None) },
-                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
-            }
-            PRINTF4("[Server]: Received (%d bytes): %.*s", bytes_received, bytes_received, read);
-
-            // transform the recieved data by function F
-            PRINTF1("[Server]: Transforming the recieved data by function F...\n");
-            std::string buffer{ read };
-            if(!F(buffer)) {
-                // send the info for the failed transformation (wrong input data) to the peer
-                PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
-                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
-                return handler_return_t(
-                    fd_set_actions_t{
-                        fd_set_Action(
-                            -1,
-                            Enum_Register_Types::None,
-                            Enum_Event_Types::None) },
-                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
-            }
-
-            // send the transformed data back to the peer
-            PRINTF1("[Server]: Sending the transformed data back to the peer...\n");
-            ::send(fd, buffer.c_str(), bytes_received, 0);
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", bytes_received, bytes_received, read);
-
-            // return the fd set actions and the handler action
-            return handler_return_t(
-                fd_set_actions_t{
-                    fd_set_Action(
-                        -1,
-                        Enum_Register_Types::None,
-                        Enum_Event_Types::None) },
-                handler_action_t(Enum_Handler_Action_Types::None, nullptr));
-        };
-    };
-
+    // Event loop interface
     class IEvent_Loop {
     public:
         virtual ~IEvent_Loop() = default;
 
         virtual void fd_register(int, Enum_Event_Types) = 0;
-        virtual void fd_unregister(int) = 0;
+        virtual void fd_unregister(int, Enum_Event_Types) = 0;
         virtual void close_sockets() = 0;
 
         virtual void run() = 0; // blocking

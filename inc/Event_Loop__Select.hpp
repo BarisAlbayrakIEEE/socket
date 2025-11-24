@@ -10,18 +10,15 @@
 #include <atomic>
 
 namespace BA_Socket {
-    template <typename Handler_Type>
     class Event_Loop__Select : public IEvent_Loop {
     public:
-        Event_Loop__Select(Handler_Type on_read, Handler_Type on_write)
-            : _on_read(on_read), _on_write(on_write)
-        {
+        Event_Loop__Select() {
             FD_ZERO(&_fds_read);
             FD_ZERO(&_fds_write);
         }
 
-        inline void fd_register(int fd, Enum_Event_Types type) override {
-            if (type == Enum_Event_Types::Read) {
+        inline void fd_register(int fd, Enum_Event_Types event_type) override {
+            if (event_type == Enum_Event_Types::Read) {
                 FD_SET(fd, &_fds_read);
             } else {
                 FD_SET(fd, &_fds_write);
@@ -29,10 +26,21 @@ namespace BA_Socket {
             if (fd > _fd_max) _fd_max = fd;
         }
 
-        inline void fd_unregister(int fd) override {
-            FD_CLR(fd, &_fds_read);
-            FD_CLR(fd, &_fds_write);
+        inline void fd_unregister(int fd, Enum_Event_Types event_type) override {
+            if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Read) {
+                FD_CLR(fd, &_fds_read);
+            }
+            if (event_type == Enum_Event_Types::Read_Write || event_type == Enum_Event_Types::Write) {
+                FD_CLR(fd, &_fds_read);
+            }
             if (fd == _fd_max) {
+                if (
+                    (event_type == Enum_Event_Types::Read && FD_ISSET(fd, &_fds_write)) ||
+                    (event_type == Enum_Event_Types::Write && FD_ISSET(fd, &_fds_read)))
+                {
+                    return;
+                }
+
                 auto fd_max = _fd_max;
                 _fd_max = -1;
                 for(SOCKET fd = 0; fd <= fd_max; ++fd) {
@@ -57,18 +65,30 @@ namespace BA_Socket {
                     if (GET_SOCKET_ERRNO() == EINTR) continue;
                     SOCKET_ERROR__SELECT();
                 }
-                for(SOCKET fd = 0; fd <= _fd_max; ++fd) {
-                    if (FD_ISSET(fd, &fds_read)) {
-                        auto fd_actions = _on_read(fd);
-                        apply_fd_action(fd_actions);
-                    }
-                    if (FD_ISSET(fd, &fds_write)) {
-                        auto fd_actions = _on_write(fd);
-                        apply_fd_action(fd_actions);
+
+                std::unordered_map<int, std::pair<bool, std::unique_ptr<IHandler>>> handler_actions;
+                for (auto& [fd, handler] : _handlers) {
+                    if (!handler) continue;
+
+                    auto handler_return = handler->apply(fd);
+                    auto fd_set_actions = std::move(handler_return.first);
+                    auto handler_actions = std::move(handler_return.second);
+                    for (const auto& fd_set_action : fd_set_actions) {
+                        if (fd_set_action._register_type == Enum_Register_Types::Register) {
+                            fd_register(fd_set_action._fd, fd_set_action._event_type);
+                        }
+                        else if (fd_set_action._register_type == Enum_Register_Types::Unregister) {
+                            fd_unregister(fd_set_action._fd, fd_set_action._event_type);
+                        }
+                        if ()
+                        
                     }
                 }
             }
         }
+    using fd_set_actions_t = std::vector<fd_set_Action>;
+    using handler_action_t = std::pair<Enum_Handler_Action_Types, std::unique_ptr<IHandler>>;
+    using handler_return_t = std::pair<fd_set_actions_t, handler_action_t>;
 
         inline void stop() override {
             _running.store(false);
@@ -103,9 +123,7 @@ namespace BA_Socket {
         }
 
     private:
-
-        Handler_Type _on_read;
-        Handler_Type _on_write;
+        std::unordered_map<int, std::unique_ptr<IHandler>> _handlers;
         fd_set _fds_read;
         fd_set _fds_write;
         int _fd_max = -1;
