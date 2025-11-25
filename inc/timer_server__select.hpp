@@ -37,7 +37,7 @@ namespace BA_Socket {
                 timeout.tv_sec = 0;
                 timeout.tv_usec = 100000;
                 if (::select(fd_max + 1, &reads, nullptr, nullptr, &timeout) < 0) {
-                    if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
+                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) break; // Ctrl+C pressed
                     SOCKET_ERROR__SELECT();
                     return 1;
                 }
@@ -59,7 +59,7 @@ namespace BA_Socket {
                             (struct sockaddr*)&client_addr,
                             &client_len);
                         if (!IS_VALID_SOCKET(fd_client)) {
-                            if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
+                            if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) break; // Ctrl+C pressed
                             SOCKET_ERROR__ACCEPT();
                             return 1;
                         }

@@ -136,8 +136,8 @@ namespace BA_Socket {
                     flags);
                 if (sent < 0) {
                     int errno_ = GET_SOCKET_ERRNO();
-                    if (errno_ == EINTR) continue; // Interrupted -> retry
-                    if (errno_ == EAGAIN || errno_ == EWOULDBLOCK) {
+                    if (errno_ == ERROR_INTERRUPTED) continue; // Interrupted -> retry
+                    if (errno_ == ERROR_BLOCKED || errno_ == EWOULDBLOCK) {
                         continue; // TODO: can wait with poll/select if needed
                     }
                     SOCKET_ERROR__SEND();
@@ -153,10 +153,11 @@ namespace BA_Socket {
         inline int recv(void* buffer, size_t length, int flags = 0) {
             int bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
             if (bytes_received == 0) {
+                PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return bytes_received;
                 }
                 CLOSE_SOCKET(_fd);
@@ -211,7 +212,6 @@ namespace BA_Socket {
             domain,
             socktype);
         if (!bind_addr) {
-            SOCKET_ERROR__GETADDRINFO();
             return Socket(INVALID_SOCKET);
         }
 
@@ -228,7 +228,6 @@ namespace BA_Socket {
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        int v6only = socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY);
         if (
             socket_.get_sockopt(SOL_SOCKET, SO_DOMAIN) == AF_INET6 &&
             socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY) &&

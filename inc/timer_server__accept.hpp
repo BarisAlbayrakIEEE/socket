@@ -47,7 +47,7 @@ namespace BA_Socket {
                     (struct sockaddr*)&client_addr,
                     &client_len);
                 if (!IS_VALID_SOCKET(fd_client)) {
-                    if (GET_SOCKET_ERRNO() == EINTR) continue;   // accept interrupted by Ctrl+C
+                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;   // accept interrupted by Ctrl+C
                     SOCKET_ERROR__ACCEPT();
                     return 1;
                 }

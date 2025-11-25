@@ -180,7 +180,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -266,7 +266,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -357,7 +357,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -454,7 +454,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -546,7 +546,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -640,7 +640,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -721,7 +721,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -768,7 +768,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -816,7 +816,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -863,7 +863,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -913,7 +913,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -960,7 +960,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1010,7 +1010,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);

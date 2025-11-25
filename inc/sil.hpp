@@ -40,6 +40,9 @@
             }                                               \
         } while (0)
     #define SOCKET_CLEANUP()   (WSACleanup())
+
+    #define ERROR_INTERRUPTED  (WSAEINTR)
+    #define ERROR_BLOCKED      (WSAEWOULDBLOCK)
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -58,6 +61,9 @@
 
     #define SOCKET_STARTUP()
     #define SOCKET_CLEANUP()
+
+    #define ERROR_INTERRUPTED  (EINTR)
+    #define ERROR_BLOCKED      (EAGAIN)
 #endif
 #if !defined(IPV6_V6ONLY)
     #define IPV6_V6ONLY 27
@@ -548,8 +554,8 @@ namespace BA_Socket {
                     flags);
                 if (sent < 0) {
                     int errno_ = GET_SOCKET_ERRNO();
-                    if (errno_ == EINTR) continue; // Interrupted -> retry
-                    if (errno_ == EAGAIN || errno_ == EWOULDBLOCK) {
+                    if (errno_ == ERROR_INTERRUPTED) continue; // Interrupted -> retry
+                    if (errno_ == ERROR_BLOCKED || errno_ == EWOULDBLOCK) {
                         continue; // TODO: can wait with poll/select if needed
                     }
                     SOCKET_ERROR__SEND();
@@ -565,10 +571,11 @@ namespace BA_Socket {
         inline int recv(void* buffer, size_t length, int flags = 0) {
             int bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
             if (bytes_received == 0) {
+                PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return bytes_received;
                 }
                 CLOSE_SOCKET(_fd);
@@ -623,7 +630,6 @@ namespace BA_Socket {
             domain,
             socktype);
         if (!bind_addr) {
-            SOCKET_ERROR__GETADDRINFO();
             return Socket(INVALID_SOCKET);
         }
 
@@ -640,7 +646,6 @@ namespace BA_Socket {
 
         // convert IPV6_V6ONLY socket to dual stack.
         // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        int v6only = socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY);
         if (
             socket_.get_sockopt(SOL_SOCKET, SO_DOMAIN) == AF_INET6 &&
             socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY) &&
@@ -868,7 +873,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -954,7 +959,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -1045,7 +1050,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -1142,7 +1147,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -1234,7 +1239,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -1328,7 +1333,7 @@ namespace BA_Socket {
                 };
             }
             else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
                     return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
                 }
 
@@ -1409,7 +1414,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1456,7 +1461,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1504,7 +1509,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1551,7 +1556,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1601,7 +1606,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1648,7 +1653,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1698,7 +1703,7 @@ namespace BA_Socket {
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
-                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
@@ -1843,7 +1848,7 @@ namespace BA_Socket {
                 fd_set fd_set__read = _fd_set__read;
                 fd_set fd_set__write = _fd_set__write;
                 if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, nullptr) < 0) {
-                    if (GET_SOCKET_ERRNO() == EINTR) continue;
+                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
                     SOCKET_ERROR__SELECT();
                 }
 
@@ -1860,35 +1865,51 @@ namespace BA_Socket {
                     handler_ptr_t>;
                 std::vector<new_action_t> new_actions;
 
-                // execute _handlers
+                // execute _handlers - read
                 int fd;
-                for (fd = 0; fd <= _fd_max; ++fd) {
-                    // an fd can be registered as both read and write
-                    // 0 for read, 1 for write
-                    for (int i = 0; i < 2; ++i) {
-                        // execute the handler
-                        handler_return_pack_t handler_return_pack;
-                        if (i == 0 && FD_ISSET(fd, &fd_set__read)) {
-                            if (!_handlers__read[fd]) continue;
-                            handler_return_pack = _handlers__read[fd]->apply();
-                        }
-                        if (i == 1 && FD_ISSET(fd, &fd_set__write)) {
-                            if (!_handlers__read[fd]) continue;
-                            handler_return_pack = _handlers__write[fd]->apply();
-                        }
-                        else continue;
-                        
-                        // loop through the fd_set actions resulted from the handler:
-                        //   collect the new actions for the fd_sets
-                        //   collect the new actions for the handlers
-                        for (auto& handler_return : handler_return_pack) {
-                            new_actions.push_back({
-                                handler_return.first._register_type,
-                                handler_return.first._handler_action_type,
-                                handler_return.first._event_type,
-                                handler_return.first._fd,
-                                std::move(handler_return.second) });
-                        }
+                handler_ptr_t handler_ptr;
+                for (auto& [fd, handler_ptr] : _handlers__read) {
+                    // execute the handler
+                    handler_return_pack_t handler_return_pack;
+                    if (FD_ISSET(fd, &fd_set__read)) {
+                        if (!handler_ptr) continue;
+                        handler_return_pack = handler_ptr->apply();
+                    }
+                    else continue;
+                    
+                    // loop through the fd_set actions resulted from the handler:
+                    //   collect the new actions for the fd_sets
+                    //   collect the new actions for the handlers
+                    for (auto& handler_return : handler_return_pack) {
+                        new_actions.push_back({
+                            handler_return.first._register_type,
+                            handler_return.first._handler_action_type,
+                            handler_return.first._event_type,
+                            handler_return.first._fd,
+                            std::move(handler_return.second) });
+                    }
+                }
+
+                // execute _handlers - read
+                for (auto& [fd, handler_ptr] : _handlers__write) {
+                    // execute the handler
+                    handler_return_pack_t handler_return_pack;
+                    if (FD_ISSET(fd, &fd_set__write)) {
+                        if (!handler_ptr) continue;
+                        handler_return_pack = handler_ptr->apply();
+                    }
+                    else continue;
+
+                    // loop through the fd_set actions resulted from the handler:
+                    //   collect the new actions for the fd_sets
+                    //   collect the new actions for the handlers
+                    for (auto& handler_return : handler_return_pack) {
+                        new_actions.push_back({
+                            handler_return.first._register_type,
+                            handler_return.first._handler_action_type,
+                            handler_return.first._event_type,
+                            handler_return.first._fd,
+                            std::move(handler_return.second) });
                     }
                 }
 

@@ -30,7 +30,7 @@ namespace BA_Socket {
             // call select to register running file descriptors to the fd_set
             fd_set reads = master;
             if (::select(fd_max + 1, &reads, nullptr, nullptr, nullptr) < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) break; // Ctrl+C pressed
                 SOCKET_ERROR__SELECT();
                 return 1;
             }
@@ -51,7 +51,7 @@ namespace BA_Socket {
                         (struct sockaddr*) &client_addr,
                         &client_len);
                     if (!IS_VALID_SOCKET(fd_client)) {
-                        if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
+                        if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) break; // Ctrl+C pressed
                         SOCKET_ERROR__ACCEPT();
                         return 1;
                     }
@@ -68,7 +68,7 @@ namespace BA_Socket {
                     if (bytes_received < 1) {
                         FD_CLR(fd, &master);
                         CLOSE_SOCKET(fd);
-                        if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
+                        if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) break; // Ctrl+C pressed
                         SOCKET_ERROR__RECV();
                         continue;
                     }

@@ -40,6 +40,9 @@
             }                                               \
         } while (0)
     #define SOCKET_CLEANUP()   (WSACleanup())
+
+    #define ERROR_INTERRUPTED  (WSAEINTR)
+    #define ERROR_BLOCKED      (WSAEWOULDBLOCK)
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -58,6 +61,9 @@
 
     #define SOCKET_STARTUP()
     #define SOCKET_CLEANUP()
+
+    #define ERROR_INTERRUPTED  (EINTR)
+    #define ERROR_BLOCKED      (EAGAIN)
 #endif
 #if !defined(IPV6_V6ONLY)
     #define IPV6_V6ONLY 27

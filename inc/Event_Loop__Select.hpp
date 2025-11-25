@@ -93,7 +93,7 @@ namespace BA_Socket {
                 fd_set fd_set__read = _fd_set__read;
                 fd_set fd_set__write = _fd_set__write;
                 if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, nullptr) < 0) {
-                    if (GET_SOCKET_ERRNO() == EINTR) continue;
+                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
                     SOCKET_ERROR__SELECT();
                 }
 
@@ -110,35 +110,51 @@ namespace BA_Socket {
                     handler_ptr_t>;
                 std::vector<new_action_t> new_actions;
 
-                // execute _handlers
+                // execute _handlers - read
                 int fd;
-                for (fd = 0; fd <= _fd_max; ++fd) {
-                    // an fd can be registered as both read and write
-                    // 0 for read, 1 for write
-                    for (int i = 0; i < 2; ++i) {
-                        // execute the handler
-                        handler_return_pack_t handler_return_pack;
-                        if (i == 0 && FD_ISSET(fd, &fd_set__read)) {
-                            if (!_handlers__read[fd]) continue;
-                            handler_return_pack = _handlers__read[fd]->apply();
-                        }
-                        if (i == 1 && FD_ISSET(fd, &fd_set__write)) {
-                            if (!_handlers__read[fd]) continue;
-                            handler_return_pack = _handlers__write[fd]->apply();
-                        }
-                        else continue;
-                        
-                        // loop through the fd_set actions resulted from the handler:
-                        //   collect the new actions for the fd_sets
-                        //   collect the new actions for the handlers
-                        for (auto& handler_return : handler_return_pack) {
-                            new_actions.push_back({
-                                handler_return.first._register_type,
-                                handler_return.first._handler_action_type,
-                                handler_return.first._event_type,
-                                handler_return.first._fd,
-                                std::move(handler_return.second) });
-                        }
+                handler_ptr_t handler_ptr;
+                for (auto& [fd, handler_ptr] : _handlers__read) {
+                    // execute the handler
+                    handler_return_pack_t handler_return_pack;
+                    if (FD_ISSET(fd, &fd_set__read)) {
+                        if (!handler_ptr) continue;
+                        handler_return_pack = handler_ptr->apply();
+                    }
+                    else continue;
+                    
+                    // loop through the fd_set actions resulted from the handler:
+                    //   collect the new actions for the fd_sets
+                    //   collect the new actions for the handlers
+                    for (auto& handler_return : handler_return_pack) {
+                        new_actions.push_back({
+                            handler_return.first._register_type,
+                            handler_return.first._handler_action_type,
+                            handler_return.first._event_type,
+                            handler_return.first._fd,
+                            std::move(handler_return.second) });
+                    }
+                }
+
+                // execute _handlers - read
+                for (auto& [fd, handler_ptr] : _handlers__write) {
+                    // execute the handler
+                    handler_return_pack_t handler_return_pack;
+                    if (FD_ISSET(fd, &fd_set__write)) {
+                        if (!handler_ptr) continue;
+                        handler_return_pack = handler_ptr->apply();
+                    }
+                    else continue;
+
+                    // loop through the fd_set actions resulted from the handler:
+                    //   collect the new actions for the fd_sets
+                    //   collect the new actions for the handlers
+                    for (auto& handler_return : handler_return_pack) {
+                        new_actions.push_back({
+                            handler_return.first._register_type,
+                            handler_return.first._handler_action_type,
+                            handler_return.first._event_type,
+                            handler_return.first._fd,
+                            std::move(handler_return.second) });
                     }
                 }
 
