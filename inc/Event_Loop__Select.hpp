@@ -55,6 +55,10 @@ namespace BA_Socket {
             }
         }
 
+        inline void add_handler(int fd, std::unique_ptr<IHandler>&& handler) {
+            _handlers[fd] = std::move(handler);
+        }
+
         inline void run() override {
             _running.store(true);
             while (_running.load()) {
@@ -68,76 +72,73 @@ namespace BA_Socket {
                     SOCKET_ERROR__SELECT();
                 }
 
-                // initialize a new map to collect the new handlers
-                // those should be added to or removed from _handlers
-                //   true: handler to be added
-                //   false: handler to be removed
-                std::unordered_map<int, std::pair<bool, std::unique_ptr<IHandler>>> new_handler_actions;
+                // collect the fd_set actions and the handler actions
+                // to apply after the loop of current handlers.
+                // the 1st bool parameter:
+                //   true: register fd / add handler
+                //   false: unregister fd / remove handler
+                std::vector<std::tuple<bool, int, Enum_Event_Types>> new_actions__fd_set;
+                std::vector<std::pair<bool, std::unique_ptr<IHandler>>> new_actions__handler;
 
                 // execute _handlers
-                for (auto& [fd, handler] : _handlers) {
-                    if (!handler) continue;
+                int fd;
+                std::unique_ptr<IHandler> handler__current;
+                for (auto& [fd, handler__current] : _handlers) {
+                    if (!handler__current) continue;
 
                     // execute the handler
-                    handler_return_t handler_return;
-                    if (FD_ISSET(fd, &_fd_set_read)) 
-                        handler_return = handler->on_read(fd);
-                    else if (FD_ISSET(fd, &_fd_set_write)) 
-                        handler_return = handler->on_write(fd);
+                    handler_return_t handler_returns;
+                    if (FD_ISSET(fd, &fd_set_read)) 
+                        handler_returns = handler__current->on_read();
+                    else if (FD_ISSET(fd, &fd_set_write)) 
+                        handler_returns = handler__current->on_write();
                     else continue;
-                    auto fd_set_actions = std::move(handler_return.first);
-                    auto handler_action = std::move(handler_return.second);
-
-                    // loop through the fd_set actions reulted from the handler
-                    for (const auto& fd_set_action : fd_set_actions) {
-                        if (fd_set_action._register_type == Enum_Register_Types::Register) {
-                            fd_register(fd_set_action._fd, fd_set_action._event_type);
-                        }
-                        else if (fd_set_action._register_type == Enum_Register_Types::Unregister) {
-                            fd_unregister(fd_set_action._fd, fd_set_action._event_type);
-                        }
-                    }
                     
-                    // perform the handler action resulted from the handler:
-                    //   collect the handlers those should be added to or removed from _handlers
-                    if(handler_action.first == Enum_Handler_Action_Types::None) continue;
-                    if(handler_action.first == Enum_Handler_Action_Types::Add) {
-                        new_handler_actions[fd] = { true, std::move(handler_action.second) };
-                    }
-                    else if(handler_action.first == Enum_Handler_Action_Types::Remove) {
-                        new_handler_actions[fd] = { false, std::move(handler_action.second) };
-                    }
-                    else { // if(handler_action.first == Enum_Handler_Action_Types::Replace) {
-                        new_handler_actions[fd] = { true, std::move(handler_action.second) };
+                    // loop through the fd_set actions resulted from the handler:
+                    //   collect the new actions for the fd_sets
+                    //   collect the new actions for the handlers
+                    for (auto& handler_return : handler_returns) {
+                        auto reactor_command = std::move(handler_return.first);
+                        auto handler__new = std::move(handler_return.second);
+                        auto fd__new = handler__new->get_fd();
+
+                        // collect the new actions for the fd_sets
+                        if (reactor_command._register_type == Enum_Register_Types::Register) {
+                            new_actions__fd_set.push_back({ true, fd__new, reactor_command._event_type });
+                        }
+                        else if (reactor_command._register_type == Enum_Register_Types::Unregister) {
+                            new_actions__fd_set.push_back({ false, fd__new, reactor_command._event_type });
+                        }
+
+                        // collect the new actions for the handlers
+                        if (
+                            reactor_command._handler_action_type == Enum_Handler_Action_Types::Add ||
+                            reactor_command._handler_action_type == Enum_Handler_Action_Types::Replace)
+                        {
+                            new_actions__handler.push_back({ true, std::move(handler__new) });
+                        }
+                        else if (reactor_command._handler_action_type == Enum_Handler_Action_Types::Remove) {
+                            new_actions__handler.push_back({ false, std::move(handler__new) });
+                        }
                     }
                 }
 
-                // update _handlers by the collected handlers
-                // those should be added to or removed from _handlers
-                for (auto& [fd, handler_action_pair] : new_handler_actions) {
-                    if(handler_action_pair.first) {
-                        _handlers[fd] = std::move(handler_action_pair.second);
-                    }
-                    else {
-                        _handlers.erase(fd);
-                    }
+                // update the fd_sets and the _handlers.
+                bool add;
+                Enum_Event_Types event_type;
+                for (auto& [add, fd, event_type] : new_actions__fd_set) {
+                    if (add) fd_register(fd, event_type);
+                    else fd_unregister(fd, event_type);
+                }
+                for (auto& [add, handler__new] : new_actions__handler) {
+                    if (add) _handlers[handler__new->get_fd()] = (std::move(handler__new));
+                    else _handlers.erase(handler__new->get_fd());
                 }
             }
         }
 
         inline void stop() override {
             _running.store(false);
-        }
-
-        inline void close_sockets() override {
-            for (SOCKET fd = 0; fd <= _fd_max; ++fd) {
-                if (FD_ISSET(fd, &_fd_set_read)) {
-                    CLOSE_SOCKET(fd);
-                }
-                if (FD_ISSET(fd, &_fd_set_write)) {
-                    CLOSE_SOCKET(fd);
-                }
-            }
         }
 
     private:

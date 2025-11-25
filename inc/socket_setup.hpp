@@ -146,4 +146,7 @@
         throw std::runtime_error(std::string("[select() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
 #endif
 
+// separate reads and writes:
+#define SEPARATE_READ_WRITE
+
 #endif // SOCKET_SETUP_HPP

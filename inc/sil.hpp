@@ -146,6 +146,9 @@
         throw std::runtime_error(std::string("[select() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
 #endif
 
+// separate reads and writes:
+#define SEPARATE_READ_WRITE
+
 #endif // SOCKET_SETUP_HPP
 
 
@@ -407,280 +410,10 @@ namespace BA_Socket {
 
 
 
-// Socket.hpp
+// handlers.hpp
 
-#ifndef SOCKET_HPP
-#define SOCKET_HPP
-
-#include "utility_addr.hpp"
-#include <stdexcept>
-#include <utility>
-#include <cstring>
-#include <stdio.h>
-
-namespace BA_Socket {
-    class Socket {
-    public:
-        explicit Socket(SOCKET fd) noexcept : _fd(fd) {};
-        Socket(int domain, int type, int protocol) {
-            _fd = ::socket(domain, type, protocol);
-            if (!IS_VALID_SOCKET(_fd)) {
-                SOCKET_ERROR__SOCKET();
-            }
-        }
-        ~Socket() { close(); };
-
-        // non-copyable but movable
-        Socket(const Socket&) = default;
-        Socket& operator=(const Socket&) = default;
-        Socket(Socket&& rhs) noexcept : _fd(rhs._fd) {
-            rhs._fd = INVALID_SOCKET;
-        }
-        Socket& operator=(Socket&& rhs) noexcept {
-            if (this != &rhs) {
-                close();
-                _fd = rhs._fd;
-                rhs._fd = INVALID_SOCKET;
-            }
-            return *this;
-        };
-
-        // get socket option
-        // defaults:
-        //   level = SOL_SOCKET
-        //   optname = SO_DOMAIN
-        inline int get_sockopt(int level = SOL_SOCKET, int optname = SO_DOMAIN) {
-            int optval = 0;
-            socklen_t optlen = sizeof(optval);
-            if (::getsockopt(_fd, level, optname, (void*)&optval, &optlen)) {
-                SOCKET_ERROR__SETSOCKOPT();
-                return -1;
-            }
-            return optval;
-        }
-
-        // set socket option
-        // defaults:
-        //   convert IPV6_V6ONLY socket to dual stack.
-        //   disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        inline bool set_sockopt(int level = IPPROTO_IPV6, int optname = IPV6_V6ONLY, int optval = 0) {
-            if (::setsockopt(_fd, level, optname, (void*)&optval, sizeof(optval))) {
-                SOCKET_ERROR__SETSOCKOPT();
-                return false;
-            }
-            return true;
-        }
-
-        // Bind to local address
-        inline bool bind(const struct sockaddr* addr, socklen_t addrlen) {
-            if (::bind(_fd, addr, addrlen)) {
-                SOCKET_ERROR__BIND();
-                return false;
-            }
-            return true;
-        }
-
-        // Create the local bind address for any interface on given port
-        bool bind_any(uint16_t port, int family = AF_INET6, int socktype = SOCK_STREAM) {
-            // get the local address to bind to
-            char port_str[8];
-            snprintf(port_str, sizeof(port_str), "%u", port);
-
-            struct addrinfo hints{};
-            hints.ai_family = family;
-            hints.ai_socktype = socktype;
-            hints.ai_flags = AI_PASSIVE;
-            struct addrinfo* bind_addr = nullptr;
-            int status = ::getaddrinfo(nullptr, port_str, &hints, &bind_addr);
-            if (status != 0) {
-                SOCKET_ERROR__GETADDRINFO();
-                return false;
-            }
-
-            // bind the socket to the local address
-            if (::bind(_fd, bind_addr->ai_addr, bind_addr->ai_addrlen) < 0) {
-                ::freeaddrinfo(bind_addr);
-                SOCKET_ERROR__BIND();
-                return false;
-            }
-
-            // free the address info
-            ::freeaddrinfo(bind_addr);
-            return true;
-        }
-
-        // Listen for connections
-        inline bool listen(int backlog = 10) {
-            if (::listen(_fd, backlog) < 0) {
-                SOCKET_ERROR__LISTEN();
-                return false;
-            }
-            return true;
-        }
-
-        // Accept a new connection (returns a new RAII socket)
-        // inspect the returned Socket with is_valid() before use
-        inline Socket accept(struct sockaddr* addr = nullptr, socklen_t* addrlen = nullptr) {
-            SOCKET client_fd = ::accept(_fd, addr, addrlen);
-            if (!IS_VALID_SOCKET(client_fd)) {
-                SOCKET_ERROR__ACCEPT();
-                client_fd = -1;
-            }
-            return Socket(client_fd);
-        }
-
-        // Send data
-        inline ssize_t send(const void* buffer, size_t length, int flags = 0) {
-            return ::send(_fd, (const char*)buffer, static_cast<int>(length), flags);
-        }
-
-        // Safe send
-        void send_all(const void* buffer, size_t length, int flags = 0) {
-            size_t total_sent = 0;
-            const char* buf = static_cast<const char*>(buffer);
-            while (total_sent < length) {
-                ssize_t sent = ::send(
-                    _fd, buf + total_sent,
-                    static_cast<int>(length - total_sent),
-                    flags);
-                if (sent < 0) {
-                    int errno_ = GET_SOCKET_ERRNO();
-                    if (errno_ == EINTR) continue; // Interrupted -> retry
-                    if (errno_ == EAGAIN || errno_ == EWOULDBLOCK) {
-                        continue; // TODO: can wait with poll/select if needed
-                    }
-                    SOCKET_ERROR__SEND();
-                    return;
-                }
-                if (sent == 0) break; // shouldn't happen unless socket closed
-                total_sent += sent;
-            }
-        }
-
-        // Receive data
-        // inspect the return value for number of bytes received
-        inline ssize_t recv(void* buffer, size_t length, int flags = 0) {
-            ssize_t bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
-            if (bytes_received < 1) {
-                SOCKET_ERROR__RECV();
-            }
-            return bytes_received;
-        }
-
-        // Connect to remote address
-        inline bool connect(const struct sockaddr* addr, socklen_t addrlen) {
-            if (::connect(_fd, addr, addrlen) < 0) {
-                SOCKET_ERROR__CONNECT();
-                return false;
-            }
-            return true;
-        }
-
-        // Close the socket (safe to call multiple times)
-        inline void close() noexcept {
-            if (is_valid()) {
-                CLOSE_SOCKET(_fd);
-                _fd = INVALID_SOCKET;
-            }
-        }
-
-        // check if socket is valid
-        inline bool is_valid() const noexcept {
-            return IS_VALID_SOCKET(_fd);
-        }
-
-        // Access native socket handle
-        inline SOCKET native_handle() const noexcept {
-            return _fd;
-        }
-
-    private:
-        SOCKET _fd;
-    };
-
-    // convenience function to createe a socket bound to local address
-    Socket create_socket_bind_to_local_addr(
-        const std::string& bind_mode,
-        uint16_t port = 8080,
-        int domain = AF_INET6,
-        int socktype = SOCK_STREAM,
-        int flags = AI_PASSIVE)
-    {
-        // create the socket
-        struct addrinfo* bind_addr = get_local_addr_to_bind(
-            bind_mode,
-            port,
-            domain,
-            socktype);
-        if (!bind_addr) {
-            SOCKET_ERROR__GETADDRINFO();
-            return Socket(INVALID_SOCKET);
-        }
-
-        // create the socket
-        SOCKET fd = ::socket(
-            bind_addr->ai_family,
-            bind_addr->ai_socktype,
-            bind_addr->ai_protocol);
-        if (!IS_VALID_SOCKET(fd)) {
-            SOCKET_ERROR__SOCKET();
-            return Socket(INVALID_SOCKET);
-        }
-        Socket socket_{fd};
-
-        // convert IPV6_V6ONLY socket to dual stack.
-        // disable IPV6_V6ONLY to accept both IPv4 and IPv6
-        int v6only = socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY);
-        if (
-            socket_.get_sockopt(SOL_SOCKET, SO_DOMAIN) == AF_INET6 &&
-            socket_.get_sockopt(IPPROTO_IPV6, IPV6_V6ONLY) &&
-            !socket_.set_sockopt())
-        {
-            ::freeaddrinfo(bind_addr);
-            SOCKET_ERROR__SETSOCKOPT();
-            return Socket(INVALID_SOCKET);
-        }
-
-        // reuse the address and port
-        int reuseaddr = 1;
-        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr)) < 0) {
-            ::freeaddrinfo(bind_addr);
-            SOCKET_ERROR__SETSOCKOPT();
-            return Socket(INVALID_SOCKET);
-        }
-#if defined(SO_REUSEPORT)
-        int reuseport = 1;
-        if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuseport, sizeof(reuseport)) < 0) {
-            ::freeaddrinfo(bind_addr);
-            SOCKET_ERROR__SETSOCKOPT();
-            return Socket(INVALID_SOCKET);
-        }
-#endif
-
-        // bind the socket to the local address
-        if (socket_.bind(bind_addr->ai_addr, bind_addr->ai_addrlen) < 0) {
-            ::freeaddrinfo(bind_addr);
-            SOCKET_ERROR__BIND();
-            return Socket(INVALID_SOCKET);
-        }
-
-        // free the address info
-        ::freeaddrinfo(bind_addr);
-
-        return socket_;
-    }
-} // namespace BA_Socket
-
-#endif // SOCKET_HPP
-
-
-
-
-
-// IEvent_Loop.hpp
-
-#ifndef IEVENT_LOOP_HPP
-#define IEVENT_LOOP_HPP
+#ifndef HANDLERS_HPP
+#define HANDLERS_HPP
 
 #include <functional>
 #include <vector>
@@ -714,6 +447,9 @@ namespace BA_Socket {
     template <typename F>
     concept CString_Transform = 
         requires (F f, std::string& s) { { f(s) } -> std::same_as<bool>; };
+    
+    using string_forward_t = bool(const std::string&);
+    using string_transform_t = bool(std::string&);
 
     // Handler interface
     struct IHandler {
@@ -741,11 +477,10 @@ namespace BA_Socket {
     // Write handler
     //
     // fd_set actions:
-    //   Unregisters the fd from the write fd_set.
-    //   New read will register the fd again.
+    //   None
     //
     // Handler action:
-    //   Removes the handler from the handler map.
+    //   None
     struct Handler_Write : public IHandler {
         std::string _buffer{};
 
@@ -756,7 +491,7 @@ namespace BA_Socket {
             // send the data to the peer
             PRINTF1("[Server]: Sending the data to the peer...\n");
             ::send(fd, _buffer.c_str(), _buffer.size(), 0);
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.c_str(), _buffer.size(), read);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
 
             // return the fd_set actions and the handler action
             return handler_return_t(
@@ -771,18 +506,73 @@ namespace BA_Socket {
 
     // Accept handler
     //
-    // Base template: Followed by a one of read handlers.
-    // Will be specialized for the case that is followed by a write handler.
+    // Base template: Followed by a write handler.
+    // Will be specialized for the read handlers.
+    //
+    // fd_set actions:
+    //   Registers the client fd to the write fd_set.
+    //
+    // Handler action:
+    //   Adds a new write handler.
+    template <typename Next_Handler_Type>
+        requires std::is_base_of_v<IHandler, Next_Handler_Type>
+    struct Handler_Accept : public IHandler {
+        std::string _buffer{};
+
+        explicit Handler_Accept(const std::string& buffer) : _buffer(buffer) {};
+        explicit Handler_Accept(std::string&& buffer) : _buffer(std::move(buffer)) {};
+
+        handler_return_t on_read(int fd) const override {
+            // accept a new connection
+            PRINTF1("[Server]: Accepting a new connection...\n");
+            fflush(stdout);
+            struct sockaddr_storage client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            SOCKET fd_client = ::accept(
+                fd,
+                (struct sockaddr*) &client_addr,
+                &client_len);
+            if (!IS_VALID_SOCKET(fd_client)) {
+                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+            print_sockaddr<is_debug_mode>(client_addr, client_len);
+
+            // return the fd_set actions and the handler action
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        fd_client,
+                        Enum_Register_Types::Register,
+                        Enum_Event_Types::Write) },
+                handler_action_t(
+                    Enum_Handler_Action_Types::Add,
+                    std::make_unique<Handler_Write>(_buffer)));
+        };
+    };
+
+    // Accept handler
+    //
+    // Specialization for: Followed by a Handler_Read_Forward<F>.
     //
     // fd_set actions:
     //   Registers the client fd to the read fd_set.
     //
     // Handler action:
-    //   Adds a new handler of type Next_Handler_Type.
-    //   Next handler type shall be one of read handlers (e.g. read-forward).
-    template <typename Next_Handler_Type>
-        requires std::is_base_of_v<IHandler, Next_Handler_Type>
-    struct Handler_Accept : public IHandler {
+    //   Adds a new Handler_Read_Forward<F>.
+    template <typename F>
+        requires CString_Forward<F>
+    struct Handler_Accept<Handler_Read_Forward<F>> : public IHandler {
+        F const* _forwarder{};
+
+        explicit Handler_Accept(F const* forwarder) : _forwarder(forwarder) {};
+
         handler_return_t on_read(int fd) const override {
             // accept a new connection
             PRINTF1("[Server]: Accepting a new connection...\n");
@@ -814,27 +604,20 @@ namespace BA_Socket {
                         Enum_Event_Types::Read) },
                 handler_action_t(
                     Enum_Handler_Action_Types::Add,
-                    std::make_unique<Next_Handler_Type>()));
+                    std::make_unique<Handler_Read_Forward>(_forwarder)));
         };
     };
 
     // Accept handler
     //
-    // Specialization for: Followed by a write handler.
-    // Will be specialized for the case that is followed by a write handler.
+    // Specialization for: Followed by a Handler_Read_Redirect.
     //
     // fd_set actions:
-    //   Registers the client fd to the write fd_set.
+    //   Registers the client fd to the read fd_set.
     //
     // Handler action:
-    //   Adds a new Handler_Write.
-    template <>
-    struct Handler_Accept<Handler_Write> : public IHandler {
-        std::string _buffer{};
-
-        explicit Handler_Accept(const std::string& buffer) : _buffer(buffer) {};
-        explicit Handler_Accept(std::string&& buffer) : _buffer(std::move(buffer)) {};
-
+    //   Adds a new Handler_Read_Redirect.
+    struct Handler_Accept<Handler_Read_Redirect> : public IHandler {
         handler_return_t on_read(int fd) const override {
             // accept a new connection
             PRINTF1("[Server]: Accepting a new connection...\n");
@@ -845,7 +628,7 @@ namespace BA_Socket {
                 fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
-            if (!IS_VALID_SOCKET(fd)) {
+            if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
                 return handler_return_t(
                     fd_set_actions_t{
@@ -863,13 +646,229 @@ namespace BA_Socket {
                     fd_set_Action(
                         fd_client,
                         Enum_Register_Types::Register,
-                        Enum_Event_Types::Write) },
+                        Enum_Event_Types::Read) },
                 handler_action_t(
                     Enum_Handler_Action_Types::Add,
-                    std::make_unique<Handler_Write>(_buffer)));
+                    std::make_unique<Handler_Read_Redirect>()));
         };
     };
 
+    // Accept handler
+    //
+    // Specialization for: Followed by Handler_Read_Transform<F, Handler_Write>.
+    //
+    // fd_set actions:
+    //   Registers the client fd to the read fd_set.
+    //
+    // Handler action:
+    //   Adds a new Handler_Read_Transform<F, Handler_Write>.
+    template <typename F>
+        requires CString_Transform<F>
+    struct Handler_Accept<Handler_Read_Transform<F, Handler_Write>> : public IHandler {
+        F const* _transformer{};
+
+        explicit Handler_Accept(F const* transformer) : _transformer(transformer) {};
+        Handler_Read_Transform(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Read_Transform(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
+
+        handler_return_t on_read(int fd) const override {
+            // accept a new connection
+            PRINTF1("[Server]: Accepting a new connection...\n");
+            fflush(stdout);
+            struct sockaddr_storage client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            SOCKET fd_client = ::accept(
+                fd,
+                (struct sockaddr*) &client_addr,
+                &client_len);
+            if (!IS_VALID_SOCKET(fd_client)) {
+                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+            print_sockaddr<is_debug_mode>(client_addr, client_len);
+
+            // return the fd_set actions and the handler action
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        fd_client,
+                        Enum_Register_Types::Register,
+                        Enum_Event_Types::Read) },
+                handler_action_t(
+                    Enum_Handler_Action_Types::Add,
+                    std::make_unique<Handler_Read_Transform<F, Handler_Write>>(_transformer)));
+        };
+    };
+
+    // Accept handler
+    //
+    // Specialization for: Followed by Handler_Read_Transform<F, Handler_Redirect>.
+    //
+    // fd_set actions:
+    //   Registers the client fd to the read fd_set.
+    //
+    // Handler action:
+    //   Adds a new Handler_Read_Transform<F, Handler_Redirect>.
+    template <typename F>
+        requires CString_Transform<F>
+    struct Handler_Accept<Handler_Read_Transform<F, Handler_Redirect>> : public IHandler {
+        F const* _transformer{};
+        std::vector<int> _fds;
+
+        Handler_Accept(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Accept(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
+
+        handler_return_t on_read(int fd) const override {
+            // accept a new connection
+            PRINTF1("[Server]: Accepting a new connection...\n");
+            fflush(stdout);
+            struct sockaddr_storage client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            SOCKET fd_client = ::accept(
+                fd,
+                (struct sockaddr*) &client_addr,
+                &client_len);
+            if (!IS_VALID_SOCKET(fd_client)) {
+                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+            print_sockaddr<is_debug_mode>(client_addr, client_len);
+
+            // return the fd_set actions and the handler action
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        fd_client,
+                        Enum_Register_Types::Register,
+                        Enum_Event_Types::Read) },
+                handler_action_t(
+                    Enum_Handler_Action_Types::Add,
+                    std::make_unique<Handler_Read_Transform<F, Handler_Redirect>>(_transformer, _fds)));
+        };
+    };
+
+    // Accept handler
+    //
+    // Specialization for: Followed by a Handler_Read_Transform_Write.
+    //
+    // fd_set actions:
+    //   Registers the client fd to the read fd_set.
+    //
+    // Handler action:
+    //   Adds a new Handler_Read_Transform_Write.
+    template <typename F>
+        requires CString_Transform<F>
+    struct Handler_Accept<Handler_Read_Transform_Write<F>> : public IHandler {
+        F const* _transformer{};
+
+        explicit Handler_Accept(F const* transformer) : _transformer(transformer) {};
+
+        handler_return_t on_read(int fd) const override {
+            // accept a new connection
+            PRINTF1("[Server]: Accepting a new connection...\n");
+            fflush(stdout);
+            struct sockaddr_storage client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            SOCKET fd_client = ::accept(
+                fd,
+                (struct sockaddr*) &client_addr,
+                &client_len);
+            if (!IS_VALID_SOCKET(fd_client)) {
+                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+            print_sockaddr<is_debug_mode>(client_addr, client_len);
+
+            // return the fd_set actions and the handler action
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        fd_client,
+                        Enum_Register_Types::Register,
+                        Enum_Event_Types::Read) },
+                handler_action_t(
+                    Enum_Handler_Action_Types::Add,
+                    std::make_unique<Handler_Read_Transform_Write<F>>(_transformer)));
+        };
+    };
+
+    // Accept handler
+    //
+    // Specialization for: Followed by a Handler_Read_Transform_Redirect.
+    //
+    // fd_set actions:
+    //   Registers the client fd to the read fd_set.
+    //
+    // Handler action:
+    //   Adds a new Handler_Read_Transform_Redirect.
+    template <typename F>
+        requires CString_Transform<F>
+    struct Handler_Accept<Handler_Read_Transform_Redirect<F>> : public IHandler {
+        F const* _transformer{};
+        std::vector<int> _fds;
+
+        Handler_Accept(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Accept(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
+
+        handler_return_t on_read(int fd) const override {
+            // accept a new connection
+            PRINTF1("[Server]: Accepting a new connection...\n");
+            fflush(stdout);
+            struct sockaddr_storage client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            SOCKET fd_client = ::accept(
+                fd,
+                (struct sockaddr*) &client_addr,
+                &client_len);
+            if (!IS_VALID_SOCKET(fd_client)) {
+                if (GET_SOCKET_ERRNO() != EINTR) SOCKET_ERROR__ACCEPT();
+                return handler_return_t(
+                    fd_set_actions_t{
+                        fd_set_Action(
+                            -1,
+                            Enum_Register_Types::None,
+                            Enum_Event_Types::None) },
+                    handler_action_t(Enum_Handler_Action_Types::None, nullptr));
+            }
+            print_sockaddr<is_debug_mode>(client_addr, client_len);
+
+            // return the fd_set actions and the handler action
+            return handler_return_t(
+                fd_set_actions_t{
+                    fd_set_Action(
+                        fd_client,
+                        Enum_Register_Types::Register,
+                        Enum_Event_Types::Read) },
+                handler_action_t(
+                    Enum_Handler_Action_Types::Add,
+                    std::make_unique<Handler_Read_Transform_Redirect<F>>(_transformer, _fds)));
+        };
+    };
+    
     // Redirect handler
     //
     // fd_set actions:
@@ -892,7 +891,7 @@ namespace BA_Socket {
             for (const auto& fd_: _fds) {
                 ::send(fd_, _buffer.c_str(), _buffer.size(), 0);
             }
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), read);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
 
             // return the fd_set actions and the handler action
             return handler_return_t(
@@ -917,7 +916,11 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Forward<F>
     struct Handler_Read_Forward : public IHandler {
-        handler_return_t n_read(int fd) const override {
+        F const* _forwarder{};
+
+        explicit Handler_Read_Forward(F const* forwarder) : _forwarder(forwarder) {};
+        
+        handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
             int bytes_received = ::recv(fd, read, 1024, 0);
@@ -938,7 +941,7 @@ namespace BA_Socket {
             // forward the recieved data to function F
             PRINTF1("[Server]: Forwarding the recieved data to function F...\n");
             std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!F(buffer)) {
+            if(!(*_forwarder)(buffer)) {
                 // send the info for the failed forwarding (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed forwarding (wrong input data) to the peer...\n");
                 ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
@@ -1001,7 +1004,7 @@ namespace BA_Socket {
             for (const auto& fd_: _fds) {
                 ::send(fd_, buffer.c_str(), buffer.size(), 0);
             }
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), read);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the fd_set actions and the handler action
             return handler_return_t(
@@ -1033,6 +1036,10 @@ namespace BA_Socket {
                 std::is_same_v<Next_Handler_Type, Handler_Write> ||
                 std::is_same_v<Next_Handler_Type, Handler_Redirect>)
     struct Handler_Read_Transform : public IHandler {
+        F const* _transformer{};
+
+        explicit Handler_Read_Transform(F const* transformer) : _transformer(transformer) {};
+        
         handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
@@ -1054,7 +1061,7 @@ namespace BA_Socket {
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
             std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!F(buffer)) {
+            if(!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
@@ -1084,18 +1091,23 @@ namespace BA_Socket {
     //   Recieves the data from the peer
     //   and transforms it for the next action (write or redirect).
     //
+    // Specialization for: Followed by a redirect handler.
+    //
     // fd_set actions:
     //   Registers the fd to the write fd_set.
     //
     // Handler action:
-    //   Adds a new Handler_Write.
+    //   Adds a new Handler_Redirect.
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform<F, Handler_Redirect> : public IHandler {
+        F const* _transformer{};
         std::vector<int> _fds;
 
-        explicit Handler_Read_Transform(const std::vector<int>& fds) : _fds(fds) {};
-        explicit Handler_Read_Transform(std::vector<int>&& fds) : _fds(std::move(fds)) {};
+        Handler_Read_Transform(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Read_Transform(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
 
         handler_return_t on_read(int fd) const override {
             // receive data from the peer
@@ -1118,7 +1130,7 @@ namespace BA_Socket {
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
             std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!F(buffer)) {
+            if(!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
@@ -1157,6 +1169,10 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform_Write : public IHandler {
+        F const* _transformer{};
+
+        explicit Handler_Read_Transform_Write(F const* transformer) : _transformer(transformer) {};
+
         handler_return_t on_read(int fd) const override {
             // receive data from the peer
             char read[1024];
@@ -1178,7 +1194,7 @@ namespace BA_Socket {
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
             std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!F(buffer)) {
+            if(!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
@@ -1194,7 +1210,7 @@ namespace BA_Socket {
             // send the transformed data back to the peer
             PRINTF1("[Server]: Sending the transformed data back to the peer...\n");
             ::send(fd, buffer.c_str(), buffer.size(), 0);
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), read);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the fd_set actions and the handler action
             return handler_return_t(
@@ -1222,10 +1238,13 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform_Redirect : public IHandler {
+        F const* _transformer{};
         std::vector<int> _fds;
 
-        explicit Handler_Read_Transform_Redirect(const std::vector<int>& fds) : _fds(fds) {};
-        explicit Handler_Read_Transform_Redirect(std::vector<int>&& fds) : _fds(std::move(fds)) {};
+        Handler_Read_Transform_Redirect(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Read_Transform_Redirect(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
 
         handler_return_t on_read(int fd) const override {
             // receive data from the peer
@@ -1248,7 +1267,7 @@ namespace BA_Socket {
             // transform the recieved data by function F
             PRINTF1("[Server]: Transforming the recieved data by function F...\n");
             std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!F(buffer)) {
+            if(!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Server]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
@@ -1266,7 +1285,7 @@ namespace BA_Socket {
             for (const auto& fd_: _fds) {
                 ::send(fd_, buffer.c_str(), buffer.size(), 0);
             }
-            PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), read);
+            PRINTF4("[Server]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the fd_set actions and the handler action
             return handler_return_t(
@@ -1278,7 +1297,22 @@ namespace BA_Socket {
                 handler_action_t(Enum_Handler_Action_Types::None, nullptr));
         };
     };
+} // namespace BA_Socket
 
+#endif // HANDLERS_HPP
+
+
+
+
+
+// IEvent_Loop.hpp
+
+#ifndef IEVENT_LOOP_HPP
+#define IEVENT_LOOP_HPP
+
+#include "handlers.hpp"
+
+namespace BA_Socket {
     // Event loop interface
     class IEvent_Loop {
     public:
@@ -1286,7 +1320,6 @@ namespace BA_Socket {
 
         virtual void fd_register(int, Enum_Event_Types) = 0;
         virtual void fd_unregister(int, Enum_Event_Types) = 0;
-        virtual void close_sockets() = 0;
 
         virtual void run() = 0; // blocking
         virtual void stop() = 0;
@@ -1356,6 +1389,10 @@ namespace BA_Socket {
             }
         }
 
+        inline void add_handler(int fd, std::unique_ptr<IHandler>&& handler) {
+            _handlers[fd] = std::move(handler);
+        }
+
         inline void run() override {
             _running.store(true);
             while (_running.load()) {
@@ -1397,27 +1434,26 @@ namespace BA_Socket {
                         else if (fd_set_action._register_type == Enum_Register_Types::Unregister) {
                             fd_unregister(fd_set_action._fd, fd_set_action._event_type);
                         }
-                    }
-                    
-                    // perform the handler action resulted from the handler:
-                    //   collect the handlers those should be added to or removed from _handlers
-                    if(handler_action.first == Enum_Handler_Action_Types::None) continue;
-                    if(handler_action.first == Enum_Handler_Action_Types::Add) {
-                        new_handler_actions[fd] = { true, std::move(handler_action.second) };
-                    }
-                    else if(handler_action.first == Enum_Handler_Action_Types::Remove) {
-                        new_handler_actions[fd] = { false, std::move(handler_action.second) };
-                    }
-                    else { // if(handler_action.first == Enum_Handler_Action_Types::Replace) {
-                        new_handler_actions[fd] = { true, std::move(handler_action.second) };
+
+                        // perform the handler action resulted from the handler:
+                        //   collect the handlers those should be added to or removed from _handlers
+                        if(handler_action.first == Enum_Handler_Action_Types::Add) {
+                            new_handler_actions[fd_set_action._fd] = { true, std::move(handler_action.second) };
+                        }
+                        else if(handler_action.first == Enum_Handler_Action_Types::Remove) {
+                            new_handler_actions[fd_set_action._fd] = { false, std::move(handler_action.second) };
+                        }
+                        else if(handler_action.first == Enum_Handler_Action_Types::Replace) {
+                            new_handler_actions[fd_set_action._fd] = { true, std::move(handler_action.second) };
+                        }
                     }
                 }
 
                 // update _handlers by the collected handlers
                 // those should be added to or removed from _handlers
-                for (auto& [fd, handler_action_pair] : new_handler_actions) {
-                    if(handler_action_pair.first) {
-                        _handlers[fd] = std::move(handler_action_pair.second);
+                for (auto& [fd, handler_pair] : new_handler_actions) {
+                    if(handler_pair.first) {
+                        _handlers[fd] = std::move(handler_pair.second);
                     }
                     else {
                         _handlers.erase(fd);
@@ -1430,17 +1466,6 @@ namespace BA_Socket {
             _running.store(false);
         }
 
-        inline void close_sockets() override {
-            for (SOCKET fd = 0; fd <= _fd_max; ++fd) {
-                if (FD_ISSET(fd, &_fd_set_read)) {
-                    CLOSE_SOCKET(fd);
-                }
-                if (FD_ISSET(fd, &_fd_set_write)) {
-                    CLOSE_SOCKET(fd);
-                }
-            }
-        }
-
     private:
         std::unordered_map<int, std::unique_ptr<IHandler>> _handlers;
         fd_set _fd_set_read;
@@ -1451,3 +1476,54 @@ namespace BA_Socket {
 } // namespace BA_Socket
 
 #endif // EVENT_LOOP__SELECT_HPP
+
+
+
+
+
+// TCP_server__select.hpp
+
+#ifndef TCP_SERVER__SELECT_HPP
+#define TCP_SERVER__SELECT_HPP
+
+#include "Event_Loop__Select.hpp"
+#include <ctype.h>
+
+namespace BA_Socket {
+    void to_up(std::string& str) {
+        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+    }
+
+    int TCP_server__select_helper() {
+        // create the server socket and bind to the local address
+        PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
+        Socket socket_listen{ create_socket_bind_to_local_addr("all") };
+        if (!socket_listen.is_valid()) return 1;
+        SOCKET fd_listen = socket_listen.native_handle();
+
+        // listen for connections
+        PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
+        if (!socket_listen.listen(10)) return 1;
+
+        // create the event looop
+        Event_Loop__Select el{};
+        el.fd_register(socket_listen.native_handle(), Enum_Event_Types::Read);
+#ifdef SEPARATE_READ_WRITE
+        el.add_handler(fd_listen, std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(&to_up));
+#else
+        el.add_handler(fd_listen, std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(&to_up));
+#endif
+        el.run();
+
+        return 0;
+    }
+    
+    inline int TCP_server() {
+        SOCKET_STARTUP();
+        int status = TCP_server__select_helper();
+        SOCKET_CLEANUP();
+        return status;
+    }
+} // namespace BA_Socket
+
+#endif // TCP_SERVER__SELECT_HPP
