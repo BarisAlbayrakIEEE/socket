@@ -111,8 +111,6 @@ namespace BA_Socket {
                 std::vector<new_action_t> new_actions;
 
                 // execute _handlers - read
-                int fd;
-                handler_ptr_t handler_ptr;
                 for (auto& [fd, handler_ptr] : _handlers__read) {
                     // execute the handler
                     handler_return_pack_t handler_return_pack;
@@ -122,9 +120,7 @@ namespace BA_Socket {
                     }
                     else continue;
                     
-                    // loop through the fd_set actions resulted from the handler:
-                    //   collect the new actions for the fd_sets
-                    //   collect the new actions for the handlers
+                    // loop through the handler return pack:
                     for (auto& handler_return : handler_return_pack) {
                         new_actions.push_back({
                             handler_return.first._register_type,
@@ -135,7 +131,7 @@ namespace BA_Socket {
                     }
                 }
 
-                // execute _handlers - read
+                // execute _handlers - write
                 for (auto& [fd, handler_ptr] : _handlers__write) {
                     // execute the handler
                     handler_return_pack_t handler_return_pack;
@@ -145,9 +141,7 @@ namespace BA_Socket {
                     }
                     else continue;
 
-                    // loop through the fd_set actions resulted from the handler:
-                    //   collect the new actions for the fd_sets
-                    //   collect the new actions for the handlers
+                    // loop through the handler return pack:
                     for (auto& handler_return : handler_return_pack) {
                         new_actions.push_back({
                             handler_return.first._register_type,
@@ -158,7 +152,7 @@ namespace BA_Socket {
                     }
                 }
 
-                // update the fd_sets and the _handlers.
+                // update the fd_sets and the handler maps.
                 Enum_Register_Types register_type;
                 Enum_Handler_Action_Types handler_action_type;
                 Enum_Event_Types event_type;

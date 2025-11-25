@@ -121,7 +121,7 @@ namespace BA_Socket {
         }
 
         // Send data
-        inline ssize_t send(const void* buffer, size_t length, int flags = 0) {
+        inline int send(const void* buffer, size_t length, int flags = 0) {
             return ::send(_fd, (const char*)buffer, static_cast<int>(length), flags);
         }
 
@@ -130,20 +130,20 @@ namespace BA_Socket {
             size_t total_sent = 0;
             const char* buf = static_cast<const char*>(buffer);
             while (total_sent < length) {
-                ssize_t sent = ::send(
+                int sent = ::send(
                     _fd, buf + total_sent,
                     static_cast<int>(length - total_sent),
                     flags);
                 if (sent < 0) {
                     int errno_ = GET_SOCKET_ERRNO();
                     if (errno_ == ERROR_INTERRUPTED) continue; // Interrupted -> retry
-                    if (errno_ == ERROR_BLOCKED || errno_ == EWOULDBLOCK) {
+                    if (errno_ == ERROR_BLOCKED) {
                         continue; // TODO: can wait with poll/select if needed
                     }
                     SOCKET_ERROR__SEND();
                     return;
                 }
-                if (sent == 0) break; // shouldn't happen unless socket closed
+                if (sent == 0) break; // shouldn't happen unless socket is closed
                 total_sent += sent;
             }
         }
@@ -210,7 +210,8 @@ namespace BA_Socket {
             bind_mode,
             port,
             domain,
-            socktype);
+            socktype,
+            flags);
         if (!bind_addr) {
             return Socket(INVALID_SOCKET);
         }

@@ -158,7 +158,7 @@ namespace BA_Socket {
 
         struct ifaddrs *ifaddrs_;
         if (getifaddrs(&ifaddrs_) == -1) {
-            SOCKET_ERROR__GETIFADDRS();
+            SOCKET_ERROR__GETADDRS();
             return 0;
         }
 
@@ -209,7 +209,7 @@ namespace BA_Socket {
                 }
             }
         }
-        SOCKET_ERROR__GETIFADDRS();
+        SOCKET_ERROR__GETADDRS();
         return std::string();
     }
 

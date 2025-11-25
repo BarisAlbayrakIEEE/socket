@@ -84,10 +84,10 @@
     #define SOCKET_ERROR__ALLOC() \
         fprintf(stderr, "[malloc() error]\n")
     #if defined(_WIN32)
-        #define SOCKET_ERROR__GETADAPTERSADDRESSES() \
+        #define SOCKET_ERROR__GETADDRS() \
             fprintf(stderr, "[GetAdaptersAddresses() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #else
-        #define SOCKET_ERROR__GETIFADDRS() \
+        #define SOCKET_ERROR__GETADDRS() \
             fprintf(stderr, "[getifaddrs() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #endif
     #define SOCKET_ERROR__GETADDRINFO() \
@@ -124,10 +124,10 @@
     #define SOCKET_ERROR__ALLOC() \
         throw std::runtime_error(std::string("[malloc() error] "))
     #if defined(_WIN32)
-        #define SOCKET_ERROR__GETADAPTERSADDRESSES() \
+        #define SOCKET_ERROR__GETADDRS() \
             throw std::runtime_error(std::string("[GetAdaptersAddresses() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #else
-        #define SOCKET_ERROR__GETIFADDRS() \
+        #define SOCKET_ERROR__GETADDRS() \
             throw std::runtime_error(std::string("[getifaddrs() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #endif
     #define SOCKET_ERROR__GETADDRINFO() \
@@ -321,7 +321,7 @@ namespace BA_Socket {
 
         struct ifaddrs *ifaddrs_;
         if (getifaddrs(&ifaddrs_) == -1) {
-            SOCKET_ERROR__GETIFADDRS();
+            SOCKET_ERROR__GETADDRS();
             return 0;
         }
 
@@ -372,7 +372,7 @@ namespace BA_Socket {
                 }
             }
         }
-        SOCKET_ERROR__GETIFADDRS();
+        SOCKET_ERROR__GETADDRS();
         return std::string();
     }
 
@@ -539,7 +539,7 @@ namespace BA_Socket {
         }
 
         // Send data
-        inline ssize_t send(const void* buffer, size_t length, int flags = 0) {
+        inline int send(const void* buffer, size_t length, int flags = 0) {
             return ::send(_fd, (const char*)buffer, static_cast<int>(length), flags);
         }
 
@@ -548,20 +548,20 @@ namespace BA_Socket {
             size_t total_sent = 0;
             const char* buf = static_cast<const char*>(buffer);
             while (total_sent < length) {
-                ssize_t sent = ::send(
+                int sent = ::send(
                     _fd, buf + total_sent,
                     static_cast<int>(length - total_sent),
                     flags);
                 if (sent < 0) {
                     int errno_ = GET_SOCKET_ERRNO();
                     if (errno_ == ERROR_INTERRUPTED) continue; // Interrupted -> retry
-                    if (errno_ == ERROR_BLOCKED || errno_ == EWOULDBLOCK) {
+                    if (errno_ == ERROR_BLOCKED) {
                         continue; // TODO: can wait with poll/select if needed
                     }
                     SOCKET_ERROR__SEND();
                     return;
                 }
-                if (sent == 0) break; // shouldn't happen unless socket closed
+                if (sent == 0) break; // shouldn't happen unless socket is closed
                 total_sent += sent;
             }
         }
@@ -628,7 +628,8 @@ namespace BA_Socket {
             bind_mode,
             port,
             domain,
-            socktype);
+            socktype,
+            flags);
         if (!bind_addr) {
             return Socket(INVALID_SOCKET);
         }
@@ -1866,8 +1867,6 @@ namespace BA_Socket {
                 std::vector<new_action_t> new_actions;
 
                 // execute _handlers - read
-                int fd;
-                handler_ptr_t handler_ptr;
                 for (auto& [fd, handler_ptr] : _handlers__read) {
                     // execute the handler
                     handler_return_pack_t handler_return_pack;
@@ -1877,9 +1876,7 @@ namespace BA_Socket {
                     }
                     else continue;
                     
-                    // loop through the fd_set actions resulted from the handler:
-                    //   collect the new actions for the fd_sets
-                    //   collect the new actions for the handlers
+                    // loop through the handler return pack:
                     for (auto& handler_return : handler_return_pack) {
                         new_actions.push_back({
                             handler_return.first._register_type,
@@ -1890,7 +1887,7 @@ namespace BA_Socket {
                     }
                 }
 
-                // execute _handlers - read
+                // execute _handlers - write
                 for (auto& [fd, handler_ptr] : _handlers__write) {
                     // execute the handler
                     handler_return_pack_t handler_return_pack;
@@ -1900,9 +1897,7 @@ namespace BA_Socket {
                     }
                     else continue;
 
-                    // loop through the fd_set actions resulted from the handler:
-                    //   collect the new actions for the fd_sets
-                    //   collect the new actions for the handlers
+                    // loop through the handler return pack:
                     for (auto& handler_return : handler_return_pack) {
                         new_actions.push_back({
                             handler_return.first._register_type,
@@ -1913,7 +1908,7 @@ namespace BA_Socket {
                     }
                 }
 
-                // update the fd_sets and the _handlers.
+                // update the fd_sets and the handler maps.
                 Enum_Register_Types register_type;
                 Enum_Handler_Action_Types handler_action_type;
                 Enum_Event_Types event_type;

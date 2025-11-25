@@ -84,10 +84,10 @@
     #define SOCKET_ERROR__ALLOC() \
         fprintf(stderr, "[malloc() error]\n")
     #if defined(_WIN32)
-        #define SOCKET_ERROR__GETADAPTERSADDRESSES() \
+        #define SOCKET_ERROR__GETADDRS() \
             fprintf(stderr, "[GetAdaptersAddresses() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #else
-        #define SOCKET_ERROR__GETIFADDRS() \
+        #define SOCKET_ERROR__GETADDRS() \
             fprintf(stderr, "[getifaddrs() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #endif
     #define SOCKET_ERROR__GETADDRINFO() \
@@ -124,10 +124,10 @@
     #define SOCKET_ERROR__ALLOC() \
         throw std::runtime_error(std::string("[malloc() error] "))
     #if defined(_WIN32)
-        #define SOCKET_ERROR__GETADAPTERSADDRESSES() \
+        #define SOCKET_ERROR__GETADDRS() \
             throw std::runtime_error(std::string("[GetAdaptersAddresses() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #else
-        #define SOCKET_ERROR__GETIFADDRS() \
+        #define SOCKET_ERROR__GETADDRS() \
             throw std::runtime_error(std::string("[getifaddrs() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #endif
     #define SOCKET_ERROR__GETADDRINFO() \
