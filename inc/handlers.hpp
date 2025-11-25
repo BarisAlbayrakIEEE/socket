@@ -162,7 +162,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -249,7 +248,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -341,7 +339,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -439,7 +436,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -532,7 +528,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -627,7 +622,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(

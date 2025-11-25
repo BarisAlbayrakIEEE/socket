@@ -566,7 +566,6 @@ namespace BA_Socket {
             int bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
             if (bytes_received == 0) {
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
             }
             else if (bytes_received < 0) {
                 if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
@@ -671,7 +670,6 @@ namespace BA_Socket {
         // bind the socket to the local address
         if (!socket_.bind(bind_addr->ai_addr, bind_addr->ai_addrlen)) {
             ::freeaddrinfo(bind_addr);
-            SOCKET_ERROR__BIND();
             return Socket(INVALID_SOCKET);
         }
 
@@ -852,7 +850,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -939,7 +936,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -1031,7 +1027,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -1129,7 +1124,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -1222,7 +1216,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -1317,7 +1310,6 @@ namespace BA_Socket {
             if (bytes_received == 0) {
                 PRINTF1("Peer closed the connection.\n");
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
                 return handler_return_pack_t{
                     handler_return_pair_t(
                         Reactor_Command(
@@ -1771,21 +1763,20 @@ namespace BA_Socket {
 
 namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
-        using handler_pair_t = std::pair<handler_ptr_t, handler_ptr_t>;
     public:
         Event_Loop__Select() {
-            FD_ZERO(&_fd_set_read);
-            FD_ZERO(&_fd_set_write);
+            FD_ZERO(&_fd_set__read);
+            FD_ZERO(&_fd_set__write);
         }
 
         inline void fd_register(int fd, Enum_Event_Types event_type) override {
             if (event_type == Enum_Event_Types::None) return;
 
             if (event_type == Enum_Event_Types::Read) {
-                FD_SET(fd, &_fd_set_read);
+                FD_SET(fd, &_fd_set__read);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                FD_SET(fd, &_fd_set_write);
+                FD_SET(fd, &_fd_set__write);
             }
             if (fd > _fd_max) _fd_max = fd;
         }
@@ -1794,15 +1785,15 @@ namespace BA_Socket {
             if (event_type == Enum_Event_Types::None) return;
             
             if (event_type == Enum_Event_Types::Read) {
-                FD_CLR(fd, &_fd_set_read);
+                FD_CLR(fd, &_fd_set__read);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                FD_CLR(fd, &_fd_set_write);
+                FD_CLR(fd, &_fd_set__write);
             }
             if (fd == _fd_max) {
                 if (
-                    (event_type == Enum_Event_Types::Read && FD_ISSET(fd, &_fd_set_write)) ||
-                    (event_type == Enum_Event_Types::Write && FD_ISSET(fd, &_fd_set_read)))
+                    (event_type == Enum_Event_Types::Read && FD_ISSET(fd, &_fd_set__write)) ||
+                    (event_type == Enum_Event_Types::Write && FD_ISSET(fd, &_fd_set__read)))
                 {
                     return;
                 }
@@ -1810,10 +1801,10 @@ namespace BA_Socket {
                 auto fd_max = _fd_max;
                 _fd_max = -1;
                 for(SOCKET fd = 0; fd <= fd_max; ++fd) {
-                    if (FD_ISSET(fd, &_fd_set_read)) {
+                    if (FD_ISSET(fd, &_fd_set__read)) {
                         if (fd > _fd_max) _fd_max = fd;
                     }
-                    if (FD_ISSET(fd, &_fd_set_write)) {
+                    if (FD_ISSET(fd, &_fd_set__write)) {
                         if (fd > _fd_max) _fd_max = fd;
                     }
                 }
@@ -1825,10 +1816,10 @@ namespace BA_Socket {
             if (event_type == Enum_Event_Types::None) return;
 
             if (event_type == Enum_Event_Types::Read) {
-                _handlers[handler->get_fd()].first = std::move(handler);
+                _handlers__read[handler->get_fd()] = std::move(handler);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                _handlers[handler->get_fd()].second = std::move(handler);
+                _handlers__write[handler->get_fd()] = std::move(handler);
             }
         }
 
@@ -1836,12 +1827,10 @@ namespace BA_Socket {
             if (event_type == Enum_Event_Types::None) return;
 
             if (event_type == Enum_Event_Types::Read) {
-                if (!_handlers[fd].second) _handlers.erase(fd);
-                _handlers[fd].first = nullptr;
+                _handlers__read.erase(fd);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                if (!_handlers[fd].first) _handlers.erase(fd);
-                _handlers[fd].second = nullptr;
+                _handlers__write.erase(fd);
             }
         }
 
@@ -1851,9 +1840,9 @@ namespace BA_Socket {
                 if (_fd_max < 0) break;
 
                 // perform select operation
-                fd_set fd_set_read = _fd_set_read;
-                fd_set fd_set_write = _fd_set_write;
-                if (::select(_fd_max + 1, &fd_set_read, &fd_set_write, nullptr, nullptr) < 0) {
+                fd_set fd_set__read = _fd_set__read;
+                fd_set fd_set__write = _fd_set__write;
+                if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, nullptr) < 0) {
                     if (GET_SOCKET_ERRNO() == EINTR) continue;
                     SOCKET_ERROR__SELECT();
                 }
@@ -1873,28 +1862,33 @@ namespace BA_Socket {
 
                 // execute _handlers
                 int fd;
-                handler_pair_t handler__pair;
-                for (auto& [fd, handler__pair] : _handlers) {
-                    if (!handler__pair.first && !handler__pair.second) continue;
-
-                    // execute the handler
-                    handler_return_pack_t handler_return_pack;
-                    if (FD_ISSET(fd, &fd_set_read)) 
-                        handler_return_pack = handler__pair.first->apply();
-                    else if (FD_ISSET(fd, &fd_set_write)) 
-                        handler_return_pack = handler__pair.second->apply();
-                    else continue;
-                    
-                    // loop through the fd_set actions resulted from the handler:
-                    //   collect the new actions for the fd_sets
-                    //   collect the new actions for the handlers
-                    for (auto& handler_return : handler_return_pack) {
-                        new_actions.push_back({
-                            handler_return.first._register_type,
-                            handler_return.first._handler_action_type,
-                            handler_return.first._event_type,
-                            handler_return.first._fd,
-                            std::move(handler_return.second) });
+                for (fd = 0; fd <= _fd_max; ++fd) {
+                    // an fd can be registered as both read and write
+                    // 0 for read, 1 for write
+                    for (int i = 0; i < 2; ++i) {
+                        // execute the handler
+                        handler_return_pack_t handler_return_pack;
+                        if (i == 0 && FD_ISSET(fd, &fd_set__read)) {
+                            if (!_handlers__read[fd]) continue;
+                            handler_return_pack = _handlers__read[fd]->apply();
+                        }
+                        if (i == 1 && FD_ISSET(fd, &fd_set__write)) {
+                            if (!_handlers__read[fd]) continue;
+                            handler_return_pack = _handlers__write[fd]->apply();
+                        }
+                        else continue;
+                        
+                        // loop through the fd_set actions resulted from the handler:
+                        //   collect the new actions for the fd_sets
+                        //   collect the new actions for the handlers
+                        for (auto& handler_return : handler_return_pack) {
+                            new_actions.push_back({
+                                handler_return.first._register_type,
+                                handler_return.first._handler_action_type,
+                                handler_return.first._event_type,
+                                handler_return.first._fd,
+                                std::move(handler_return.second) });
+                        }
                     }
                 }
 
@@ -1929,9 +1923,10 @@ namespace BA_Socket {
         }
 
     private:
-        std::unordered_map<int, std::pair<handler_ptr_t, handler_ptr_t>> _handlers;
-        fd_set _fd_set_read;
-        fd_set _fd_set_write;
+        std::unordered_map<int, handler_ptr_t> _handlers__read;
+        std::unordered_map<int, handler_ptr_t> _handlers__write;
+        fd_set _fd_set__read;
+        fd_set _fd_set__write;
         int _fd_max = -1;
         std::atomic<bool> _running{false};
     };
@@ -1960,7 +1955,7 @@ namespace BA_Socket {
     int TCP_server__select_helper() {
         // create the server socket and bind to the local address
         PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
-        Socket socket_listen{ create_socket_bind_to_local_addr("all") };
+        Socket socket_listen = create_socket_bind_to_local_addr("all");
         if (!socket_listen.is_valid()) return 1;
         SOCKET fd_listen = socket_listen.native_handle();
 

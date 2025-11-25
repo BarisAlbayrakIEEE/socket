@@ -15,7 +15,7 @@ namespace BA_Socket {
     int TCP_server__select_helper() {
         // create the server socket and bind to the local address
         PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
-        Socket socket_listen{ create_socket_bind_to_local_addr("all") };
+        Socket socket_listen = create_socket_bind_to_local_addr("all");
         if (!socket_listen.is_valid()) return 1;
         SOCKET fd_listen = socket_listen.native_handle();
 

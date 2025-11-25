@@ -154,7 +154,6 @@ namespace BA_Socket {
             int bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
             if (bytes_received == 0) {
                 CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
             }
             else if (bytes_received < 0) {
                 if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
@@ -259,7 +258,6 @@ namespace BA_Socket {
         // bind the socket to the local address
         if (!socket_.bind(bind_addr->ai_addr, bind_addr->ai_addrlen)) {
             ::freeaddrinfo(bind_addr);
-            SOCKET_ERROR__BIND();
             return Socket(INVALID_SOCKET);
         }
 
