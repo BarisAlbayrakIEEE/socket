@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 #include <utility>
+#include <type_traits>
 #include <concepts>
 #include "Socket.hpp"
 
@@ -33,6 +34,18 @@ namespace BA_Socket {
         Enum_Register_Types _register_type{ Enum_Register_Types::None };
         Enum_Event_Types _event_type{ Enum_Event_Types::None };
         Enum_Handler_Action_Types _handler_action_type{ Enum_Handler_Action_Types::None };
+
+        Reactor_Command() = default;
+        Reactor_Command(
+            int fd,
+            Enum_Register_Types register_type,
+            Enum_Event_Types event_type,
+            Enum_Handler_Action_Types handler_action_type)
+            :
+            _fd(fd),
+            _register_type(register_type),
+            _event_type(event_type),
+            _handler_action_type(handler_action_type) {};
     };
 
     struct IHandler;
@@ -72,6 +85,27 @@ namespace BA_Socket {
     template <typename Next_Handler_Type>
         requires std::is_base_of_v<IHandler, Next_Handler_Type>
     struct Handler_Accept;
+
+    // a helper function for ::recv
+    inline bool recv_helper(int fd) {
+        PRINTF1("Receiving data from peer...\n");
+        char read[1024];
+        int bytes_received = ::recv(fd, read, 1024, 0);
+        if (bytes_received == 0) {
+            PRINTF1("Peer closed the connection.\n");
+            CLOSE_SOCKET(fd);
+            return false;
+        }
+        else if (bytes_received < 0) {
+            if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
+                return false;
+            }
+            CLOSE_SOCKET(fd);
+            SOCKET_ERROR__RECV();
+            return false;
+        }
+        PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+    }
 
     // Write handler
     //

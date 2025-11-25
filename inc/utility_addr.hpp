@@ -92,17 +92,18 @@ namespace BA_Socket {
     typedef struct Uniform_Addr {
         char name[128];
         unsigned int flags;
+        struct sockaddr_storage addr_storage;
         struct sockaddr *sock_addr;
         socklen_t addr_len;
     } Uniform_Addr;
 
 #ifdef _WIN32
-    // get uniform address - windows
-    size_t get_local_addrs_uniform(Uniform_Addr *uniform_addrs, size_t max) {
+
+    size_t get_local_addrs_uniform(Uniform_Addr* uniform_addrs, size_t max) {
         DWORD asize = 15000;
         PIP_ADAPTER_ADDRESSES adapter_addrs = NULL;
         while (1) {
-            adapter_addrs = (PIP_ADAPTER_ADDRESSES)malloc(asize);
+            adapter_addrs = (PIP_ADAPTER_ADDRESSES)std::malloc(asize);
             if (!adapter_addrs) {
                 SOCKET_ERROR__ALLOC();
                 return 0;
@@ -115,20 +116,19 @@ namespace BA_Socket {
                 adapter_addrs,
                 &asize);
             if (result == ERROR_BUFFER_OVERFLOW) {
-                free(adapter_addrs);
+                std::free(adapter_addrs);
                 adapter_addrs = NULL;
                 continue;
             } else if (result != ERROR_SUCCESS) {
-                SOCKET_ERROR__GETADAPTERSADDRESSES();
-                free(adapter_addrs);
+                SOCKET_ERROR__GETADDRS();
+                std::free(adapter_addrs);
                 return 0;
             }
             break;
         }
 
         size_t count = 0;
-        for (
-            PIP_ADAPTER_ADDRESSES it = adapter_addrs;
+        for (PIP_ADAPTER_ADDRESSES it = adapter_addrs;
             it && count < max;
             it = it->Next)
         {
@@ -137,21 +137,26 @@ namespace BA_Socket {
                 adapter_unicast_addr && count < max;
                 adapter_unicast_addr = adapter_unicast_addr->Next)
             {
-                Uniform_Addr *uniform_addr = &uniform_addrs[count++];
-                memset(uniform_addr, 0, sizeof(*uniform_addr));
-                wcstombs(
-                    uniform_addr->name,
-                    it->FriendlyName,
-                    sizeof(uniform_addr->name));
+                auto* sa = adapter_unicast_addr->Address.lpSockaddr;
+                int family = sa->sa_family;
+                if (family != AF_INET && family != AF_INET6) continue;
+
+                Uniform_Addr* uniform_addr = &uniform_addrs[count++];
+                std::memset(uniform_addr, 0, sizeof(*uniform_addr));
+                std::wcstombs(uniform_addr->name, it->FriendlyName, sizeof(uniform_addr->name));
+
                 uniform_addr->flags = it->Flags;
-                uniform_addr->sock_addr = adapter_unicast_addr->Address.lpSockaddr;
-                uniform_addr->addr_len = adapter_unicast_addr->Address.iSockaddrLength;
+                uniform_addr->addr_len = static_cast<socklen_t>(adapter_unicast_addr->Address.iSockaddrLength);
+                std::memcpy(&uniform_addr->addr_storage, sa, uniform_addr->addr_len);
+                uniform_addr->sock_addr = reinterpret_cast<struct sockaddr*>(&uniform_addr->addr_storage);
             }
         }
-        free(adapter_addrs);
+        std::free(adapter_addrs);
         return count;
     }
+
 #else
+
     // get uniform address - linux/unix
     size_t get_local_addrs_uniform(Uniform_Addr *uniform_addrs, size_t max) {
         PRINTF1("Obtaining all addresses...\n");
@@ -172,19 +177,22 @@ namespace BA_Socket {
             int family = it->ifa_addr->sa_family;
             if (family != AF_INET && family != AF_INET6) continue;
 
-            Uniform_Addr *uniform_addr = &uniform_addrs[count++];
-            memset(uniform_addr, 0, sizeof(*uniform_addr));
-            strncpy(uniform_addr->name, it->ifa_name, sizeof(uniform_addr->name));
+            Uniform_Addr* uniform_addr = &uniform_addrs[count++];
+            std::memset(uniform_addr, 0, sizeof(*uniform_addr));
+            std::strncpy(uniform_addr->name, it->ifa_name, sizeof(uniform_addr->name) - 1);
+
+            uniform_addr->name[sizeof(uniform_addr->name) - 1] = '\0';
             uniform_addr->flags = it->ifa_flags;
-            uniform_addr->sock_addr = it->ifa_addr;
-            uniform_addr->addr_len =
-                (family == AF_INET) ?
-                sizeof(struct sockaddr_in) :
-                sizeof(struct sockaddr_in6);
+            uniform_addr->addr_len = (family == AF_INET)
+                ? static_cast<socklen_t>(sizeof(struct sockaddr_in))
+                : static_cast<socklen_t>(sizeof(struct sockaddr_in6));
+            std::memcpy(&uniform_addr->addr_storage, it->ifa_addr, uniform_addr->addr_len);
+            uniform_addr->sock_addr = reinterpret_cast<struct sockaddr*>(&uniform_addr->addr_storage);
         }
         freeifaddrs(ifaddrs_);
         return count;
     }
+
 #endif
 
     inline std::string get_ip_of_interface(const std::string& ifname) {
