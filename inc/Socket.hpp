@@ -150,9 +150,17 @@ namespace BA_Socket {
 
         // Receive data
         // inspect the return value for number of bytes received
-        inline ssize_t recv(void* buffer, size_t length, int flags = 0) {
-            ssize_t bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
-            if (bytes_received < 1) {
+        inline int recv(void* buffer, size_t length, int flags = 0) {
+            int bytes_received = ::recv(_fd, (char*)buffer, static_cast<int>(length), flags);
+            if (bytes_received == 0) {
+                CLOSE_SOCKET(_fd);
+                SOCKET_ERROR__RECV();
+            }
+            else if (bytes_received < 0) {
+                if (GET_SOCKET_ERRNO() == EINTR) { // Ctrl+C
+                    return bytes_received;
+                }
+                CLOSE_SOCKET(_fd);
                 SOCKET_ERROR__RECV();
             }
             return bytes_received;
@@ -249,7 +257,7 @@ namespace BA_Socket {
 #endif
 
         // bind the socket to the local address
-        if (socket_.bind(bind_addr->ai_addr, bind_addr->ai_addrlen) < 0) {
+        if (!socket_.bind(bind_addr->ai_addr, bind_addr->ai_addrlen)) {
             ::freeaddrinfo(bind_addr);
             SOCKET_ERROR__BIND();
             return Socket(INVALID_SOCKET);
