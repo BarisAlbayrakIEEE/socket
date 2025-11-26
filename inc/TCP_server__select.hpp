@@ -25,7 +25,7 @@ namespace BA_Socket {
 
         // create the event looop
         Event_Loop__Select el{};
-        el.fd_register(socket_listen.native_handle(), Enum_Event_Types::Read);
+        el.fd_register(fd_listen, Enum_Event_Types::Read);
 #ifdef SEPARATE_READ_WRITE
         el.add_handler(
             std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(fd_listen, &to_up),
@@ -40,7 +40,7 @@ namespace BA_Socket {
         return 0;
     }
     
-    inline int TCP_server() {
+    inline int TCP_server__select() {
         SOCKET_STARTUP();
         int status = TCP_server__select_helper();
         SOCKET_CLEANUP();

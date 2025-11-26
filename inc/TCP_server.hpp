@@ -20,16 +20,16 @@ namespace BA_Socket {
         if (!socket_listen.listen(10)) return 1;
 
         // create the fd_set
-        fd_set master;
-        FD_ZERO(&master);
-        FD_SET(fd_listen, &master);
+        fd_set fd_set__read;
+        FD_ZERO(&fd_set__read);
+        FD_SET(fd_listen, &fd_set__read);
         SOCKET fd_max = fd_listen;
 
         PRINTF1("[Server]: Waiting for connections...\n");
         while(1) {
             // call select to register running file descriptors to the fd_set
-            fd_set reads = master;
-            if (::select(fd_max + 1, &reads, nullptr, nullptr, nullptr) < 0) {
+            fd_set fd_set__read_ = fd_set__read;
+            if (::select(fd_max + 1, &fd_set__read_, nullptr, nullptr, nullptr) < 0) {
                 if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) break; // Ctrl+C pressed
                 SOCKET_ERROR__SELECT();
                 return 1;
@@ -37,7 +37,7 @@ namespace BA_Socket {
 
             // loop through the file descriptors registered in the fd_set
             for(SOCKET fd = 1; fd <= fd_max; ++fd) { // start from stdout (fd=1)
-                if (!FD_ISSET(fd, &reads))
+                if (!FD_ISSET(fd, &fd_set__read_))
                     continue;
 
                 if (fd == fd_listen) { // server socket
@@ -57,8 +57,8 @@ namespace BA_Socket {
                     }
                     print_sockaddr<is_debug_mode>(client_addr, client_len);
 
-                    // add the new client socket to the master set
-                    FD_SET(fd_client, &master);
+                    // add the new client socket to the fd_set__read set
+                    FD_SET(fd_client, &fd_set__read);
                     if (fd_client > fd_max) fd_max = fd_client;
                 } else { // client socket
                     // receive data from the client
@@ -66,7 +66,7 @@ namespace BA_Socket {
                     int bytes_received = ::recv(fd, read, 1024, 0);
                     PRINTF1("[Server]: Receiving data from client...\n");
                     if (bytes_received < 1) {
-                        FD_CLR(fd, &master);
+                        FD_CLR(fd, &fd_set__read);
                         CLOSE_SOCKET(fd);
                         if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) break; // Ctrl+C pressed
                         SOCKET_ERROR__RECV();
@@ -87,7 +87,7 @@ namespace BA_Socket {
 
         // close all remaining sockets
         for (SOCKET fd = 0; fd <= fd_max; ++fd) {
-            if (FD_ISSET(fd, &master)) {
+            if (FD_ISSET(fd, &fd_set__read)) {
                 CLOSE_SOCKET(fd);
             }
         }

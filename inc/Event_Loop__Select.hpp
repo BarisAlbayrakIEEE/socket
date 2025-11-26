@@ -12,9 +12,23 @@
 namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
     public:
-        Event_Loop__Select() {
+        Event_Loop__Select(
+            time_t sec = 0,
+            suseconds_t usec = 0,
+            bool listen_stdin = false,
+            bool listen_stdout = false)
+                :
+                _sec(sec),
+                _usec(usec),
+                _listen_stdin(listen_stdin),
+                _listen_stdout(listen_stdout)
+        {
             FD_ZERO(&_fd_set__read);
             FD_ZERO(&_fd_set__write);
+#if !defined(_WIN32)
+            if (listen_stdin) FD_SET(0, &_fd_set__read); // on unix/linux, stdin fd = 0
+            if (listen_stdout) FD_SET(1, &_fd_set__write); // on unix/linux, stdout fd = 1
+#endif
         }
 
         inline void fd_register(int fd, Enum_Event_Types event_type) override {
@@ -84,15 +98,28 @@ namespace BA_Socket {
 
         inline void run() override {
             _running.store(true);
+
+            // call select to register running file descriptors to the fd_set.
+            // select needs to wait for some time,
+            // as windows doesn't support fd_set for stdin, we use a timeout loop.
+            struct timeval timeout;
+            timeval *timeout_ptr = nullptr;
+            if (_sec || _usec) {
+                timeout.tv_sec = _sec;
+                timeout.tv_usec = _usec;
+                timeout_ptr = &timeout;
+            }
+
             while (_running.load()) {
                 if (_fd_max < 0) break;
 
                 // perform select operation
                 fd_set fd_set__read = _fd_set__read;
                 fd_set fd_set__write = _fd_set__write;
-                if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, nullptr) < 0) {
+                if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, timeout_ptr) < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
                     SOCKET_ERROR__SELECT();
+                    break;
                 }
 
                 // collect the fd_set actions and the handler actions
@@ -185,6 +212,10 @@ namespace BA_Socket {
         std::unordered_map<int, handler_ptr_t> _handlers__write;
         fd_set _fd_set__read;
         fd_set _fd_set__write;
+        time_t _sec{0};
+        suseconds_t _usec{0};
+        bool _listen_stdin{};
+        bool _listen_stdout{};
         int _fd_max = -1;
         std::atomic<bool> _running{false};
     };
