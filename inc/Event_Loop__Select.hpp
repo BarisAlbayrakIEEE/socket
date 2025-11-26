@@ -28,26 +28,17 @@ namespace BA_Socket {
             else if (event_type == Enum_Event_Types::Write) {
                 FD_SET(fd, &_fd_set__write);
             }
+            else { // if (event_type == Enum_Event_Types::Read_Write) {
+                FD_SET(fd, &_fd_set__read);
+                FD_SET(fd, &_fd_set__write);
+            }
             if (fd > _fd_max) _fd_max = fd;
         }
 
-        inline void fd_unregister(int fd, Enum_Event_Types event_type) override {
-            if (event_type == Enum_Event_Types::None) return;
-            
-            if (event_type == Enum_Event_Types::Read) {
-                FD_CLR(fd, &_fd_set__read);
-            }
-            else if (event_type == Enum_Event_Types::Write) {
-                FD_CLR(fd, &_fd_set__write);
-            }
+        inline void fd_unregister(int fd) override {
+            FD_CLR(fd, &_fd_set__read);
+            FD_CLR(fd, &_fd_set__write);
             if (fd == _fd_max) {
-                if (
-                    (event_type == Enum_Event_Types::Read && FD_ISSET(fd, &_fd_set__write)) ||
-                    (event_type == Enum_Event_Types::Write && FD_ISSET(fd, &_fd_set__read)))
-                {
-                    return;
-                }
-
                 auto fd_max = _fd_max;
                 _fd_max = -1;
                 for(SOCKET fdi = 0; fdi <= fd_max; ++fdi) {
@@ -81,15 +72,9 @@ namespace BA_Socket {
             }
         }
 
-        inline void remove_handler(int fd, Enum_Event_Types event_type) {
-            if (event_type == Enum_Event_Types::None) return;
-
-            if (event_type == Enum_Event_Types::Read) {
-                _handlers__read.erase(fd);
-            }
-            else if (event_type == Enum_Event_Types::Write) {
-                _handlers__write.erase(fd);
-            }
+        inline void remove_handler(int fd) {
+            _handlers__read.erase(fd);
+            _handlers__write.erase(fd);
         }
 
         inline void run() override {
@@ -133,6 +118,8 @@ namespace BA_Socket {
 
                 // execute _handlers - read
                 for (auto& [fd, handler_ptr] : _handlers__read) {
+                    if (!IS_VALID_SOCKET(fd)) continue;
+
                     // inspect the fd and handler
                     if (!handler_ptr) continue;
 #if defined(_WIN32)
@@ -157,6 +144,8 @@ namespace BA_Socket {
 
                 // execute _handlers - write
                 for (auto& [fd, handler_ptr] : _handlers__write) {
+                    if (!IS_VALID_SOCKET(fd)) continue;
+                    
                     // execute the handler
                     handler_return_pack_t handler_return_pack;
                     if (FD_ISSET(fd, &fd_set__write)) {
@@ -183,7 +172,7 @@ namespace BA_Socket {
                 handler_ptr_t handler__new;
                 for (auto& [register_type, handler_action_type, event_type, fd, handler__new] : new_actions) {
                     if (register_type == Enum_Register_Types::Unregister) {
-                        fd_unregister(fd, event_type);
+                        fd_unregister(fd);
                     }
                     else if (register_type == Enum_Register_Types::Register) {
                         fd_register(fd, event_type);
@@ -196,7 +185,7 @@ namespace BA_Socket {
                     }
                     else if (handler_action_type == Enum_Handler_Action_Types::Remove)
                     {
-                        remove_handler(fd, event_type);
+                        remove_handler(fd);
                     }
                 }
             }

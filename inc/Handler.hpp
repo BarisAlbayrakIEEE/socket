@@ -12,20 +12,18 @@
 #include "Socket.hpp"
 
 #define READ_LEN 4096
-#define HANDLER_RETURN_PACK__EMPTY(fd__)                 \
+#define HANDLER_RETURN_PACK__NONE()                      \
+    return handler_return_pack_t{                        \
+        handler_return_pair_t(                           \
+            Reactor_Command{},                           \
+            nullptr) }
+#define HANDLER_RETURN_PACK__UNREGISTER(fd__)            \
     return handler_return_pack_t{                        \
         handler_return_pair_t(                           \
             Reactor_Command(                             \
                 (fd__),                                  \
                 Enum_Register_Types::Unregister,         \
-                Enum_Event_Types::Read,                  \
-                Enum_Handler_Action_Types::Remove),      \
-            nullptr),                                    \
-        handler_return_pair_t(                           \
-            Reactor_Command(                             \
-                (fd__),                                  \
-                Enum_Register_Types::Unregister,         \
-                Enum_Event_Types::Write,                 \
+                Enum_Event_Types::Read_Write,            \
                 Enum_Handler_Action_Types::Remove),      \
             nullptr)                                     \
     }
@@ -44,7 +42,7 @@ namespace BA_Socket {
 
     enum class Enum_Register_Types { None, Register, Unregister };
     enum class Enum_Handler_Action_Types { None, Add, Remove, Replace };
-    enum class Enum_Event_Types { None, Read, Write };
+    enum class Enum_Event_Types { None, Read, Write, Read_Write }; // Read_Write is for unregister op
 
     const std::string INFO_WRONG_DATA = "Wrong data for the request";
 
@@ -77,7 +75,7 @@ namespace BA_Socket {
         virtual ~IHandler() = default;
         virtual int get_fd() const = 0;
         virtual inline handler_return_pack_t apply() const {
-            return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+            HANDLER_RETURN_PACK__NONE();
         };
     };
 
@@ -163,7 +161,7 @@ namespace BA_Socket {
             PRINTF4("[Handler]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
 
             // return the handler pack
-            return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+            HANDLER_RETURN_PACK__NONE();
         };
     };
     
@@ -195,7 +193,7 @@ namespace BA_Socket {
             PRINTF4("[Handler]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
 
             // return the handler pack
-            return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+            HANDLER_RETURN_PACK__NONE();
         };
     };
 
@@ -222,7 +220,7 @@ namespace BA_Socket {
         handler_return_pack_t apply() const override {
             std::string buffer;
             if (!read_helper(_fd, buffer))
-                HANDLER_RETURN_PACK__EMPTY(_fd);
+                HANDLER_RETURN_PACK__UNREGISTER(_fd);
 
             // forward the recieved data to function F
             PRINTF1("[Handler]: Forwarding the recieved data to function F...\n");
@@ -230,11 +228,11 @@ namespace BA_Socket {
                 // send the info for the failed forwarding (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed forwarding (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
 
             // return the handler pack
-            return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+            HANDLER_RETURN_PACK__NONE();
         };
     };
 
@@ -261,7 +259,7 @@ namespace BA_Socket {
         handler_return_pack_t apply() const override {
             std::string buffer;
             if (!read_helper(_fd, buffer))
-                HANDLER_RETURN_PACK__EMPTY(_fd);
+                HANDLER_RETURN_PACK__UNREGISTER(_fd);
 
             // redirect the data to the contained fds
             PRINTF1("[Handler]: Redirecting the data to the ...\n");
@@ -271,7 +269,7 @@ namespace BA_Socket {
             PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the handler pack
-            return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+            HANDLER_RETURN_PACK__NONE();
         };
     };
 
@@ -305,7 +303,7 @@ namespace BA_Socket {
         handler_return_pack_t apply() const override {
             std::string buffer;
             if (!read_helper(_fd, buffer))
-                HANDLER_RETURN_PACK__EMPTY(_fd);
+                HANDLER_RETURN_PACK__UNREGISTER(_fd);
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -313,7 +311,7 @@ namespace BA_Socket {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
 
             // return the handler pack
@@ -355,7 +353,7 @@ namespace BA_Socket {
         handler_return_pack_t apply() const override {
             std::string buffer;
             if (!read_helper(_fd, buffer))
-                HANDLER_RETURN_PACK__EMPTY(_fd);
+                HANDLER_RETURN_PACK__UNREGISTER(_fd);
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -363,7 +361,7 @@ namespace BA_Socket {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
 
             // return the handler pack
@@ -400,7 +398,7 @@ namespace BA_Socket {
         handler_return_pack_t apply() const override {
             std::string buffer;
             if (!read_helper(_fd, buffer))
-                HANDLER_RETURN_PACK__EMPTY(_fd);
+                HANDLER_RETURN_PACK__UNREGISTER(_fd);
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -408,7 +406,7 @@ namespace BA_Socket {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
 
             // send the transformed data back to the peer
@@ -417,7 +415,7 @@ namespace BA_Socket {
             PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the handler pack
-            return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+            HANDLER_RETURN_PACK__NONE();
         };
     };
 
@@ -447,7 +445,7 @@ namespace BA_Socket {
         handler_return_pack_t apply() const override {
             std::string buffer;
             if (!read_helper(_fd, buffer))
-                HANDLER_RETURN_PACK__EMPTY(_fd);
+                HANDLER_RETURN_PACK__UNREGISTER(_fd);
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -455,7 +453,7 @@ namespace BA_Socket {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
 
             // redirect the data to the contained fds
@@ -466,7 +464,7 @@ namespace BA_Socket {
             PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the handler pack
-            return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+            HANDLER_RETURN_PACK__NONE();
         };
     };
 
@@ -505,7 +503,7 @@ namespace BA_Socket {
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
@@ -552,7 +550,7 @@ namespace BA_Socket {
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
@@ -600,7 +598,7 @@ namespace BA_Socket {
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
@@ -647,7 +645,7 @@ namespace BA_Socket {
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
@@ -697,7 +695,7 @@ namespace BA_Socket {
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
@@ -744,7 +742,7 @@ namespace BA_Socket {
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
@@ -794,7 +792,7 @@ namespace BA_Socket {
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
                 if (GET_SOCKET_ERRNO() != ERROR_INTERRUPTED) SOCKET_ERROR__ACCEPT();
-                return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
+                HANDLER_RETURN_PACK__NONE();
             }
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
