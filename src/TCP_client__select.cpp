@@ -5,7 +5,7 @@ using namespace BA_Socket;
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "usage: tcp_client__select hostname port\n");
+        fprintf(stderr, "usage: TCP_client__select hostname port\n");
         return 1;
     }
     

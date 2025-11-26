@@ -1,7 +1,7 @@
-// handlers.hpp
+// Handler.hpp
 
-#ifndef HANDLERS_HPP
-#define HANDLERS_HPP
+#ifndef HANDLER_HPP
+#define HANDLER_HPP
 
 #include <functional>
 #include <vector>
@@ -10,6 +10,25 @@
 #include <type_traits>
 #include <concepts>
 #include "Socket.hpp"
+
+#define READ_LEN 4096
+#define HANDLER_RETURN_PACK__EMPTY(fd__)                 \
+    return handler_return_pack_t{                        \
+        handler_return_pair_t(                           \
+            Reactor_Command(                             \
+                (fd__),                                  \
+                Enum_Register_Types::Unregister,         \
+                Enum_Event_Types::Read,                  \
+                Enum_Handler_Action_Types::Remove),      \
+            nullptr),                                    \
+        handler_return_pair_t(                           \
+            Reactor_Command(                             \
+                (fd__),                                  \
+                Enum_Register_Types::Unregister,         \
+                Enum_Event_Types::Write,                 \
+                Enum_Handler_Action_Types::Remove),      \
+            nullptr)                                     \
+    }
 
 namespace BA_Socket {
     template <typename F>
@@ -86,25 +105,37 @@ namespace BA_Socket {
         requires std::is_base_of_v<IHandler, Next_Handler_Type>
     struct Handler_Accept;
 
-    // a helper function for ::recv
-    inline bool recv_helper(int fd) {
-        PRINTF1("Receiving data from peer...\n");
-        char read[1024];
-        int bytes_received = ::recv(fd, read, 1024, 0);
-        if (bytes_received == 0) {
-            PRINTF1("Peer closed the connection.\n");
-            CLOSE_SOCKET(fd);
-            return false;
-        }
-        else if (bytes_received < 0) {
-            if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
+    // read helper function
+    inline bool read_helper(int fd, std::string& buffer) {
+        buffer.resize(READ_LEN);
+        if (fd == 0) {
+            // receive data from stdin
+            PRINTF1("[Handler]: Reading user input...\n");
+            if (!std::fgets(buffer.data(), READ_LEN, stdin)) {
+                PRINTF1("[Handler]: EOF for stdin.\n");
                 return false;
             }
-            CLOSE_SOCKET(fd);
-            SOCKET_ERROR__RECV();
-            return false;
+            buffer.resize(std::strlen(buffer.data()));
+            PRINTF4("[Handler]: Read (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.data());
+        } else {
+            // receive data from the peer
+            PRINTF1("[Handler]: Receiving data from peer...\n");
+            int bytes_received = ::recv(fd, buffer.data(), READ_LEN, 0);
+            if (bytes_received == 0) {
+                PRINTF1("[Handler]: Peer closed the connection.\n");
+                CLOSE_SOCKET(fd);
+                return false;
+            }
+            else if (bytes_received < 0) {
+                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) return false; // Ctrl+C
+                CLOSE_SOCKET(fd);
+                SOCKET_ERROR__RECV();
+                return false;
+            }
+            buffer.resize(bytes_received);
+            PRINTF4("[Handler]: Received (%d bytes): %.*s", bytes_received, bytes_received, buffer.data());
         }
-        PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+        return true;
     }
 
     // Write handler
@@ -127,9 +158,9 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // send the data to the peer
-            PRINTF1("Sending the data to the peer...\n");
+            PRINTF1("[Handler]: Sending the data to the peer...\n");
             ::send(_fd, _buffer.c_str(), _buffer.size(), 0);
-            PRINTF4("Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
+            PRINTF4("[Handler]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
 
             // return the handler pack
             return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
@@ -157,11 +188,11 @@ namespace BA_Socket {
 
         inline handler_return_pack_t apply() const override {
             // send the data to the peer
-            PRINTF1("Sending the data to the peer...\n");
+            PRINTF1("[Handler]: Sending the data to the peer...\n");
             for (const auto& fd_: _fds) {
                 ::send(fd_, _buffer.c_str(), _buffer.size(), 0);
             }
-            PRINTF4("Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
+            PRINTF4("[Handler]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
 
             // return the handler pack
             return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
@@ -189,62 +220,15 @@ namespace BA_Socket {
         inline int get_fd() const override { return _fd; };
         
         handler_return_pack_t apply() const override {
-            // receive data from the peer
-            PRINTF1("Receiving data from peer...\n");
-            char read[1024];
-            int bytes_received = ::recv(_fd, read, 1024, 0);
-            if (bytes_received == 0) {
-                PRINTF1("Peer closed the connection.\n");
-                CLOSE_SOCKET(_fd);
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
-                    return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
-                }
-
-                CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+            std::string buffer;
+            if (!read_helper(_fd, buffer))
+                HANDLER_RETURN_PACK__EMPTY(_fd);
 
             // forward the recieved data to function F
-            PRINTF1("Forwarding the recieved data to function F...\n");
-            std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!(*_forwarder)(buffer)) {
+            PRINTF1("[Handler]: Forwarding the recieved data to function F...\n");
+            if (!(*_forwarder)(buffer)) {
                 // send the info for the failed forwarding (wrong input data) to the peer
-                PRINTF1("Sending the info for the failed forwarding (wrong input data) to the peer...\n");
+                PRINTF1("[Handler]: Sending the info for the failed forwarding (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
@@ -275,63 +259,16 @@ namespace BA_Socket {
         inline int get_fd() const override { return _fd; };
 
         handler_return_pack_t apply() const override {
-            // receive data from the peer
-            PRINTF1("Receiving data from peer...\n");
-            char read[1024];
-            int bytes_received = ::recv(_fd, read, 1024, 0);
-            if (bytes_received == 0) {
-                PRINTF1("Peer closed the connection.\n");
-                CLOSE_SOCKET(_fd);
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
-                    return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
-                }
-
-                CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+            std::string buffer;
+            if (!read_helper(_fd, buffer))
+                HANDLER_RETURN_PACK__EMPTY(_fd);
 
             // redirect the data to the contained fds
-            PRINTF1("Redirecting the data to the ...\n");
-            std::string buffer{ read, static_cast<size_t>(bytes_received) };
+            PRINTF1("[Handler]: Redirecting the data to the ...\n");
             for (const auto& fd_: _fds) {
                 ::send(fd_, buffer.c_str(), buffer.size(), 0);
             }
-            PRINTF4("Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
+            PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the handler pack
             return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
@@ -366,62 +303,15 @@ namespace BA_Socket {
         inline int get_fd() const override { return _fd; };
         
         handler_return_pack_t apply() const override {
-            // receive data from the peer
-            PRINTF1("Receiving data from peer...\n");
-            char read[1024];
-            int bytes_received = ::recv(_fd, read, 1024, 0);
-            if (bytes_received == 0) {
-                PRINTF1("Peer closed the connection.\n");
-                CLOSE_SOCKET(_fd);
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
-                    return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
-                }
-
-                CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+            std::string buffer;
+            if (!read_helper(_fd, buffer))
+                HANDLER_RETURN_PACK__EMPTY(_fd);
 
             // transform the recieved data by function F
-            PRINTF1("Transforming the recieved data by function F...\n");
-            std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!(*_transformer)(buffer)) {
+            PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
+            if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
-                PRINTF1("Sending the info for the failed transformation (wrong input data) to the peer...\n");
+                PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
@@ -463,62 +353,15 @@ namespace BA_Socket {
         inline int get_fd() const override { return _fd; };
 
         handler_return_pack_t apply() const override {
-            // receive data from the peer
-            PRINTF1("Receiving data from peer...\n");
-            char read[1024];
-            int bytes_received = ::recv(_fd, read, 1024, 0);
-            if (bytes_received == 0) {
-                PRINTF1("Peer closed the connection.\n");
-                CLOSE_SOCKET(_fd);
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
-                    return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
-                }
-
-                CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+            std::string buffer;
+            if (!read_helper(_fd, buffer))
+                HANDLER_RETURN_PACK__EMPTY(_fd);
 
             // transform the recieved data by function F
-            PRINTF1("Transforming the recieved data by function F...\n");
-            std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!(*_transformer)(buffer)) {
+            PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
+            if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
-                PRINTF1("Sending the info for the failed transformation (wrong input data) to the peer...\n");
+                PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
@@ -555,70 +398,23 @@ namespace BA_Socket {
         inline int get_fd() const override { return _fd; };
 
         handler_return_pack_t apply() const override {
-            // receive data from the peer
-            PRINTF1("Receiving data from peer...\n");
-            char read[1024];
-            int bytes_received = ::recv(_fd, read, 1024, 0);
-            if (bytes_received == 0) {
-                PRINTF1("Peer closed the connection.\n");
-                CLOSE_SOCKET(_fd);
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
-                    return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
-                }
-
-                CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+            std::string buffer;
+            if (!read_helper(_fd, buffer))
+                HANDLER_RETURN_PACK__EMPTY(_fd);
 
             // transform the recieved data by function F
-            PRINTF1("Transforming the recieved data by function F...\n");
-            std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!(*_transformer)(buffer)) {
+            PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
+            if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
-                PRINTF1("Sending the info for the failed transformation (wrong input data) to the peer...\n");
+                PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
 
             // send the transformed data back to the peer
-            PRINTF1("Sending the transformed data back to the peer...\n");
+            PRINTF1("[Handler]: Sending the transformed data back to the peer...\n");
             ::send(_fd, buffer.c_str(), buffer.size(), 0);
-            PRINTF4("Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
+            PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the handler pack
             return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
@@ -649,72 +445,25 @@ namespace BA_Socket {
         inline int get_fd() const override { return _fd; };
 
         handler_return_pack_t apply() const override {
-            // receive data from the peer
-            PRINTF1("Receiving data from peer...\n");
-            char read[1024];
-            int bytes_received = ::recv(_fd, read, 1024, 0);
-            if (bytes_received == 0) {
-                PRINTF1("Peer closed the connection.\n");
-                CLOSE_SOCKET(_fd);
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            else if (bytes_received < 0) {
-                if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) { // Ctrl+C
-                    return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
-                }
-
-                CLOSE_SOCKET(_fd);
-                SOCKET_ERROR__RECV();
-                return handler_return_pack_t{
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Read,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr),
-                    handler_return_pair_t(
-                        Reactor_Command(
-                            _fd,
-                            Enum_Register_Types::Unregister,
-                            Enum_Event_Types::Write,
-                            Enum_Handler_Action_Types::Remove),
-                        nullptr)
-                };
-            }
-            PRINTF4("Received (%d bytes): %.*s", bytes_received, bytes_received, read);
+            std::string buffer;
+            if (!read_helper(_fd, buffer))
+                HANDLER_RETURN_PACK__EMPTY(_fd);
 
             // transform the recieved data by function F
-            PRINTF1("Transforming the recieved data by function F...\n");
-            std::string buffer{ read, static_cast<size_t>(bytes_received) };
-            if(!(*_transformer)(buffer)) {
+            PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
+            if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
-                PRINTF1("Sending the info for the failed transformation (wrong input data) to the peer...\n");
+                PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
                 ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
             }
 
             // redirect the data to the contained fds
-            PRINTF1("Redirecting the data to the ...\n");
+            PRINTF1("[Handler]: Redirecting the data to the ...\n");
             for (const auto& fd_: _fds) {
                 ::send(fd_, buffer.c_str(), buffer.size(), 0);
             }
-            PRINTF4("Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
+            PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the handler pack
             return handler_return_pack_t{ handler_return_pair_t(Reactor_Command{}, nullptr) };
@@ -746,7 +495,7 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // accept a new connection
-            PRINTF1("Accepting a new connection...\n");
+            PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -793,7 +542,7 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // accept a new connection
-            PRINTF1("Accepting a new connection...\n");
+            PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -841,7 +590,7 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // accept a new connection
-            PRINTF1("Accepting a new connection...\n");
+            PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -888,7 +637,7 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // accept a new connection
-            PRINTF1("Accepting a new connection...\n");
+            PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -938,7 +687,7 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // accept a new connection
-            PRINTF1("Accepting a new connection...\n");
+            PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -985,7 +734,7 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // accept a new connection
-            PRINTF1("Accepting a new connection...\n");
+            PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -1035,7 +784,7 @@ namespace BA_Socket {
 
         handler_return_pack_t apply() const override {
             // accept a new connection
-            PRINTF1("Accepting a new connection...\n");
+            PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -1061,4 +810,4 @@ namespace BA_Socket {
     };
 } // namespace BA_Socket
 
-#endif // HANDLERS_HPP
+#endif // HANDLER_HPP

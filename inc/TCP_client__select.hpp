@@ -22,7 +22,7 @@ namespace BA_Socket {
 
         // create the peer socket
         PRINTF1("[Client]: Creating the peer socket...\n");
-        Socket socket_peer{
+        Socket socket_peer {
             peer_addr->ai_family,
             peer_addr->ai_socktype,
             peer_addr->ai_protocol};
@@ -35,7 +35,7 @@ namespace BA_Socket {
 
         // connect to the remote server
         PRINTF1("[Client]: Connecting to the remote server...\n");
-        if (!socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen)) {
+        if (!::connect(fd_peer, peer_addr->ai_addr, peer_addr->ai_addrlen)) {
             ::freeaddrinfo(peer_addr);
             return 1;
         }
@@ -45,92 +45,13 @@ namespace BA_Socket {
         PRINTF1("[Client]: Connected to the remote server.\n");
         PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
-        // create the fd_set
-        fd_set fd_set__read;
-        FD_ZERO(&fd_set__read);
-        FD_SET(fd_peer, &fd_set__read);
-#if !defined(_WIN32)
-        FD_SET(0, &fd_set__read); // on unix/linux, stdin fd = 0
-#endif
-
-        // call select to register running file descriptors to the fd_set.
-        // select needs to wait for some time,
-        // as windows doesn't support fd_set for stdin, we use a timeout loop.
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 100000;
-
-        // loop for the data transfer: terminal -> server OR server -> terminal
-        while(1) {
-            // create the fd_set
-            fd_set fd_set__read_ = fd_set__read;
-
-            // call select to register running file descriptors to the fd_set.
-            // select needs to wait for some time,
-            // as windows doesn't support fd_set for stdin, we use a timeout loop.
-            struct timeval timeout_ = timeout;
-            timeout.tv_sec = 0;
-            timeout.tv_usec = 100000;
-            if (::select(fd_peer + 1, &fd_set__read_, nullptr, nullptr, &timeout_) < 0) {
-                if (GET_SOCKET_ERRNO() == EINTR) break; // Ctrl+C pressed
-                SOCKET_ERROR__SELECT();
-                return 1;
-            }
-
-            // check if data from peer
-            if (FD_ISSET(fd_peer, &fd_set__read_)) {
-                char read[4096];
-                int bytes_received = socket_peer.recv(read, 4096, 0);
-                PRINTF1("[Client]: Receiving data from peer...\n");
-                if (bytes_received < 1) {
-                    PRINTF1("[Client]: Connection closed by peer.\n");
-                    break;
-                }
-                PRINTF4("[Client]: Received (%d bytes): %.*s", bytes_received, bytes_received, read);
-            }
-
-            // check if data from stdin
-#if defined(_WIN32)
-            if(_kbhit()) {
-#else
-            if(FD_ISSET(0, &fd_set__read_)) {
-#endif
-                char read[4096];
-                PRINTF1("[Client]: Reading user input to send to peer...\n");
-                if (!fgets(read, 4096, stdin)) break; // EOF
-                PRINTF2("[Client]: Sending: %s", read);
-                int bytes_sent = socket_peer.send(read, strlen(read), 0);
-                PRINTF2("[Client]: Sent %d bytes.\n", bytes_sent);
-            }
-        }
-
-        return 0;
-
-
-
-
-        // create the server socket and bind to the local address
-        PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
-        Socket socket_listen = create_socket_bind_to_local_addr("all");
-        if (!socket_listen.is_valid()) return 1;
-        SOCKET fd_listen = socket_listen.native_handle();
-
-        // listen for connections
-        PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
-        if (!socket_listen.listen(10)) return 1;
-
         // create the event looop
-        Event_Loop__Select el{};
-        el.fd_register(socket_listen.native_handle(), Enum_Event_Types::Read);
-#ifdef SEPARATE_READ_WRITE
+        Event_Loop__Select el{ 0, 100000 };
+        el.add_stdin_to_reads();
+        el.fd_register(fd_peer, Enum_Event_Types::Write);
         el.add_handler(
-            std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(fd_listen, &to_up),
+            std::make_unique<Handler_Read_Redirect>(0, std::vector<int>{ fd_peer }),
             Enum_Event_Types::Read);
-#else
-        el.add_handler(
-            std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(fd_listen, &to_up),
-            Enum_Event_Types::Read);
-#endif
         el.run();
 
         return 0;

@@ -12,23 +12,11 @@
 namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
     public:
-        Event_Loop__Select(
-            time_t sec = 0,
-            suseconds_t usec = 0,
-            bool listen_stdin = false,
-            bool listen_stdout = false)
-                :
-                _sec(sec),
-                _usec(usec),
-                _listen_stdin(listen_stdin),
-                _listen_stdout(listen_stdout)
+        Event_Loop__Select(time_t sec = 0, suseconds_t usec = 0)
+            : _sec(sec), _usec(usec)
         {
             FD_ZERO(&_fd_set__read);
             FD_ZERO(&_fd_set__write);
-#if !defined(_WIN32)
-            if (listen_stdin) FD_SET(0, &_fd_set__read); // on unix/linux, stdin fd = 0
-            if (listen_stdout) FD_SET(1, &_fd_set__write); // on unix/linux, stdout fd = 1
-#endif
         }
 
         inline void fd_register(int fd, Enum_Event_Types event_type) override {
@@ -62,15 +50,23 @@ namespace BA_Socket {
 
                 auto fd_max = _fd_max;
                 _fd_max = -1;
-                for(SOCKET fd = 0; fd <= fd_max; ++fd) {
-                    if (FD_ISSET(fd, &_fd_set__read)) {
-                        if (fd > _fd_max) _fd_max = fd;
+                for(SOCKET fdi = 0; fdi <= fd_max; ++fdi) {
+                    if (FD_ISSET(fdi, &_fd_set__read)) {
+                        if (fdi > _fd_max) _fd_max = fdi;
                     }
-                    if (FD_ISSET(fd, &_fd_set__write)) {
-                        if (fd > _fd_max) _fd_max = fd;
+                    if (FD_ISSET(fdi, &_fd_set__write)) {
+                        if (fdi > _fd_max) _fd_max = fdi;
                     }
                 }
             }
+        }
+
+        inline void add_stdin_to_reads() {
+            FD_SET(0, &_fd_set__read);
+        }
+
+        inline void add_stdout_to_writes() {
+            FD_SET(1, &_fd_set__write);
         }
 
         inline void add_handler(handler_ptr_t&& handler, Enum_Event_Types event_type) {
@@ -137,13 +133,16 @@ namespace BA_Socket {
 
                 // execute _handlers - read
                 for (auto& [fd, handler_ptr] : _handlers__read) {
+                    // inspect the fd and handler
+                    if (!handler_ptr) continue;
+#if defined(_WIN32)
+                    if (fd == 0 && !_kbhit()) continue;
+#else
+                    if (!FD_ISSET(fd, &fd_set__read)) continue;
+#endif
+
                     // execute the handler
-                    handler_return_pack_t handler_return_pack;
-                    if (FD_ISSET(fd, &fd_set__read)) {
-                        if (!handler_ptr) continue;
-                        handler_return_pack = handler_ptr->apply();
-                    }
-                    else continue;
+                    handler_return_pack_t handler_return_pack = handler_ptr->apply();
                     
                     // loop through the handler return pack:
                     for (auto& handler_return : handler_return_pack) {
@@ -214,8 +213,6 @@ namespace BA_Socket {
         fd_set _fd_set__write;
         time_t _sec{0};
         suseconds_t _usec{0};
-        bool _listen_stdin{};
-        bool _listen_stdout{};
         int _fd_max = -1;
         std::atomic<bool> _running{false};
     };
