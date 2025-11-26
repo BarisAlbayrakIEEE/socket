@@ -81,19 +81,19 @@ namespace BA_Socket {
             if (event_type == Enum_Event_Types::None) return;
 
             if (event_type == Enum_Event_Types::Read) {
-                _handlers[handler->get_fd()]._handler__read = std::move(handler);
+                _handler_entrys[handler->get_fd()]._handler__read = std::move(handler);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                _handlers[handler->get_fd()]._handler__write = std::move(handler);
+                _handler_entrys[handler->get_fd()]._handler__write = std::move(handler);
             }
         }
 
         inline void run() override {
             _running.store(true);
 
-            // call select to register running file descriptors to the fd_set.
-            // select needs to wait for some time,
-            // as windows doesn't support fd_set for stdin, we use a timeout loop.
+            // windows only:
+            //   Windows doesn't support fd_set for stdin.
+            //   So, a timeout loop is required.
             struct timeval timeout;
             timeval *timeout_ptr = nullptr;
             if (_sec || _usec) {
@@ -102,12 +102,18 @@ namespace BA_Socket {
                 timeout_ptr = &timeout;
             }
 
+            // main loop
             while (_running.load()) {
                 if (_fd_max < 0) break;
 
                 // perform select operation
                 fd_set fd_set__read = _fd_set__read;
                 fd_set fd_set__write = _fd_set__write;
+                struct timeval timeout_;
+                if (timeout_ptr) {
+                    timeout_ = timeout;
+                    timeout_ptr = &timeout_;
+                }
                 if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, timeout_ptr) < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
                     SOCKET_ERROR__SELECT();
@@ -127,14 +133,17 @@ namespace BA_Socket {
                     handler_ptr_t>;
                 std::vector<new_action_t> new_actions;
 
-                // execute _handlers - read
-                for (auto& [fd, handler_entry] : _handlers) {
+                // execute _handler_entrys - read
+                for (auto& [fd, handler_entry] : _handler_entrys) {
                     // inspect the fd, the handler entry and the handler
                     if (!handler_entry._active) continue;
                     if (!IS_VALID_SOCKET(fd)) continue;
-                    if (FD_ISSET(fd, &fd_set__read)) continue;
 #if defined(_WIN32)
-                    if (fd == 0 && !_kbhit()) continue;
+                    if (fd == 0) {
+                        if (!_kbhit()) continue;
+                    } else {
+                        if (!FD_ISSET(fd, &fd_set__read)) continue;
+                    }
 #else
                     if (!FD_ISSET(fd, &fd_set__read)) continue;
 #endif
@@ -158,12 +167,12 @@ namespace BA_Socket {
                     }
                 }
 
-                // execute _handlers - write
-                for (auto& [fd, handler_entry] : _handlers) {
+                // execute _handler_entrys - write
+                for (auto& [fd, handler_entry] : _handler_entrys) {
                     // inspect the fd, the handler entry and the handler
                     if (!handler_entry._active) continue;
                     if (!IS_VALID_SOCKET(fd)) continue;
-                    if (FD_ISSET(fd, &fd_set__write)) continue;
+                    if (!FD_ISSET(fd, &fd_set__write)) continue;
                     auto handler_ptr = handler_entry._handler__write.get();
                     if (!handler_ptr) continue;
 
@@ -185,14 +194,10 @@ namespace BA_Socket {
                 }
 
                 // update the fd_sets and the handler maps.
-                Enum_Register_Types register_type;
-                Enum_Handler_Action_Types handler_action_type;
-                Enum_Event_Types event_type;
-                handler_ptr_t handler__new;
                 for (auto& [register_type, handler_action_type, event_type, fd, handler__new] : new_actions) {
                     if (register_type == Enum_Register_Types::Unregister) {
                         fd_unregister(fd);
-                        _handlers.erase(fd);
+                        _handler_entrys.erase(fd);
                     }
                     else if (register_type == Enum_Register_Types::Register) {
                         fd_register(fd, event_type);
@@ -212,7 +217,7 @@ namespace BA_Socket {
         }
 
     private:
-        std::unordered_map<int, Handler_Entry> _handlers;
+        std::unordered_map<int, Handler_Entry> _handler_entrys;
         fd_set _fd_set__read;
         fd_set _fd_set__write;
         time_t _sec{0};

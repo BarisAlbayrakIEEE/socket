@@ -8,8 +8,9 @@
 #include <algorithm>
 
 namespace BA_Socket {
-    void to_up(std::string& str) {
+    inline bool to_up(std::string& str) {
         std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+        return true;
     }
 
     int TCP_server__select_helper() {
