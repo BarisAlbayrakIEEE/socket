@@ -8,6 +8,10 @@
 #include <algorithm>
 
 namespace BA_Socket {
+    void write_to_stdout(const std::string& str) {
+        ;
+    }
+
     int TCP_client__select_helper(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
@@ -48,6 +52,10 @@ namespace BA_Socket {
         // create the event looop
         Event_Loop__Select el{ 0, 100000 };
         el.add_stdin_to_reads();
+        el.fd_register(fd_peer, Enum_Event_Types::Read);
+        el.add_handler(
+            std::make_unique<Handler_Read_Forward<string_forward_t>>(fd_peer, &write_to_stdout),
+            Enum_Event_Types::Read);
         el.fd_register(fd_peer, Enum_Event_Types::Write);
         el.add_handler(
             std::make_unique<Handler_Read_Redirect>(0, std::vector<int>{ fd_peer }),
