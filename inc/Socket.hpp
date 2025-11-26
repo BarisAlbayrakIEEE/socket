@@ -167,12 +167,13 @@ namespace BA_Socket {
         }
 
         // Connect to remote address
-        inline bool connect(const struct sockaddr* addr, socklen_t addrlen) {
-            if (::connect(_fd, addr, addrlen) < 0) {
+        inline int connect(const struct sockaddr* addr, socklen_t addrlen) {
+            int status = ::connect(_fd, addr, addrlen);
+            if (status < 0) {
                 SOCKET_ERROR__CONNECT();
-                return false;
+                return status;
             }
-            return true;
+            return status;
         }
 
         // Close the socket (safe to call multiple times)

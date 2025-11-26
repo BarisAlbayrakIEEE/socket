@@ -39,7 +39,7 @@ namespace BA_Socket {
 
         // connect to the remote server
         PRINTF1("[Client]: Connecting to the remote server...\n");
-        if (!::connect(fd_peer, peer_addr->ai_addr, peer_addr->ai_addrlen)) {
+        if (socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen) < 0) {
             ::freeaddrinfo(peer_addr);
             return 1;
         }

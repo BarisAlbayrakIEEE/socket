@@ -11,6 +11,22 @@
 
 namespace BA_Socket {
     class Event_Loop__Select : public IEvent_Loop {
+
+        struct Handler_Entry {
+            handler_ptr_t _handler__read{ nullptr };
+            handler_ptr_t _handler__write{ nullptr };
+            bool _active{ true };
+
+            Handler_Entry(
+                handler_ptr_t handler__read = nullptr,
+                handler_ptr_t handler__write = nullptr,
+                bool active = true)
+                :
+                _handler__read(std::move(handler__read)),
+                _handler__write(std::move(handler__write)),
+                _active(active) {}                
+        };
+
     public:
         Event_Loop__Select(time_t sec = 0, suseconds_t usec = 0)
             : _sec(sec), _usec(usec)
@@ -65,16 +81,11 @@ namespace BA_Socket {
             if (event_type == Enum_Event_Types::None) return;
 
             if (event_type == Enum_Event_Types::Read) {
-                _handlers__read[handler->get_fd()] = std::move(handler);
+                _handlers[handler->get_fd()]._handler__read = std::move(handler);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                _handlers__write[handler->get_fd()] = std::move(handler);
+                _handlers[handler->get_fd()]._handler__write = std::move(handler);
             }
-        }
-
-        inline void remove_handler(int fd) {
-            _handlers__read.erase(fd);
-            _handlers__write.erase(fd);
         }
 
         inline void run() override {
@@ -117,16 +128,18 @@ namespace BA_Socket {
                 std::vector<new_action_t> new_actions;
 
                 // execute _handlers - read
-                for (auto& [fd, handler_ptr] : _handlers__read) {
+                for (auto& [fd, handler_entry] : _handlers) {
+                    // inspect the fd, the handler entry and the handler
+                    if (!handler_entry._active) continue;
                     if (!IS_VALID_SOCKET(fd)) continue;
-
-                    // inspect the fd and handler
-                    if (!handler_ptr) continue;
+                    if (FD_ISSET(fd, &fd_set__read)) continue;
 #if defined(_WIN32)
                     if (fd == 0 && !_kbhit()) continue;
 #else
                     if (!FD_ISSET(fd, &fd_set__read)) continue;
 #endif
+                    auto handler_ptr = handler_entry._handler__read.get();
+                    if (!handler_ptr) continue;
 
                     // execute the handler
                     handler_return_pack_t handler_return_pack = handler_ptr->apply();
@@ -139,20 +152,23 @@ namespace BA_Socket {
                             handler_return.first._event_type,
                             handler_return.first._fd,
                             std::move(handler_return.second) });
+                        if (handler_return.first._register_type == Enum_Register_Types::Unregister) {
+                            handler_entry._active = false;
+                        }
                     }
                 }
 
                 // execute _handlers - write
-                for (auto& [fd, handler_ptr] : _handlers__write) {
+                for (auto& [fd, handler_entry] : _handlers) {
+                    // inspect the fd, the handler entry and the handler
+                    if (!handler_entry._active) continue;
                     if (!IS_VALID_SOCKET(fd)) continue;
-                    
+                    if (FD_ISSET(fd, &fd_set__write)) continue;
+                    auto handler_ptr = handler_entry._handler__write.get();
+                    if (!handler_ptr) continue;
+
                     // execute the handler
-                    handler_return_pack_t handler_return_pack;
-                    if (FD_ISSET(fd, &fd_set__write)) {
-                        if (!handler_ptr) continue;
-                        handler_return_pack = handler_ptr->apply();
-                    }
-                    else continue;
+                    handler_return_pack_t handler_return_pack = handler_ptr->apply();
 
                     // loop through the handler return pack:
                     for (auto& handler_return : handler_return_pack) {
@@ -162,6 +178,9 @@ namespace BA_Socket {
                             handler_return.first._event_type,
                             handler_return.first._fd,
                             std::move(handler_return.second) });
+                        if (handler_return.first._register_type == Enum_Register_Types::Unregister) {
+                            handler_entry._active = false;
+                        }
                     }
                 }
 
@@ -173,6 +192,7 @@ namespace BA_Socket {
                 for (auto& [register_type, handler_action_type, event_type, fd, handler__new] : new_actions) {
                     if (register_type == Enum_Register_Types::Unregister) {
                         fd_unregister(fd);
+                        _handlers.erase(fd);
                     }
                     else if (register_type == Enum_Register_Types::Register) {
                         fd_register(fd, event_type);
@@ -183,10 +203,6 @@ namespace BA_Socket {
                     {
                         add_handler(std::move(handler__new), event_type);
                     }
-                    else if (handler_action_type == Enum_Handler_Action_Types::Remove)
-                    {
-                        remove_handler(fd);
-                    }
                 }
             }
         }
@@ -196,8 +212,7 @@ namespace BA_Socket {
         }
 
     private:
-        std::unordered_map<int, handler_ptr_t> _handlers__read;
-        std::unordered_map<int, handler_ptr_t> _handlers__write;
+        std::unordered_map<int, Handler_Entry> _handlers;
         fd_set _fd_set__read;
         fd_set _fd_set__write;
         time_t _sec{0};
