@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/BA_Socket.dir/TCP_client__select__MT.cpp.o CMakeFiles/BA_Socket.dir/TCP_client__select__ST.cpp.o CMakeFiles/BA_Socket.dir/TCP_server__select__MT.cpp.o CMakeFiles/BA_Socket.dir/TCP_server__select__ST.cpp.o -o ../bin/BA_Socket 

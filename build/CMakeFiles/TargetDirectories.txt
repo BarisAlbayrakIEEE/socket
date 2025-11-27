@@ -1,0 +1,9 @@
+/home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles/edit_cache.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles/rebuild_cache.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/BA_Socket.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/edit_cache.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/rebuild_cache.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/test/CMakeFiles/edit_cache.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/test/CMakeFiles/rebuild_cache.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/benchmark/CMakeFiles/edit_cache.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/benchmark/CMakeFiles/rebuild_cache.dir
