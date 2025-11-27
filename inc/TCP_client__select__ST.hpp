@@ -1,9 +1,9 @@
-// TCP_client__select.hpp
+// TCP_client__select__ST.hpp
 
-#ifndef TCP_CLIENT__SELECT_HPP
-#define TCP_CLIENT__SELECT_HPP
+#ifndef TCP_CLIENT__SELECT__ST_HPP
+#define TCP_CLIENT__SELECT__ST_HPP
 
-#include "Event_Loop__Select.hpp"
+#include "Event_Loop__Select__ST.hpp"
 #include <ctype.h>
 #include <algorithm>
 
@@ -13,7 +13,7 @@ namespace BA_Socket {
         return true;
     }
 
-    int TCP_client__select_helper(
+    int TCP_client__select__ST_helper(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
@@ -51,7 +51,7 @@ namespace BA_Socket {
         PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // create the event looop
-        Event_Loop__Select el{ 0, 100000 };
+        Event_Loop__Select__ST el{ 0, 100000 };
         el.add_stdin_to_reads();
         el.add_handler(
             std::make_unique<Handler_Read_Redirect>(0, std::vector<int>{ fd_peer }),
@@ -66,16 +66,16 @@ namespace BA_Socket {
         return 0;
     }
     
-    inline int TCP_client__select(
+    inline int TCP_client__select__ST(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
     {
         SOCKET_STARTUP();
-        int status = TCP_client__select_helper(hostname, port, family);
+        int status = TCP_client__select__ST_helper(hostname, port, family);
         SOCKET_CLEANUP();
         return status;
     }
 } // namespace BA_Socket
 
-#endif // TCP_CLIENT__SELECT_HPP
+#endif // TCP_CLIENT__SELECT__ST_HPP

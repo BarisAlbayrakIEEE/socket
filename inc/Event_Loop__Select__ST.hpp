@@ -1,7 +1,8 @@
-// Event_Loop__Select.hpp
+// Event_Loop__Select__ST.hpp
+// Single-threaded select event loop
 
-#ifndef EVENT_LOOP__SELECT_HPP
-#define EVENT_LOOP__SELECT_HPP
+#ifndef EVENT_LOOP__SELECT__ST_HPP
+#define EVENT_LOOP__SELECT__ST_HPP
 
 #include "IEvent_Loop.hpp"
 #include <tuple>
@@ -10,8 +11,7 @@
 #include <atomic>
 
 namespace BA_Socket {
-    class Event_Loop__Select : public IEvent_Loop {
-
+    class Event_Loop__Select__ST : public IEvent_Loop {
         struct Handler_Entry {
             handler_ptr_t _handler__read{ nullptr };
             handler_ptr_t _handler__write{ nullptr };
@@ -28,7 +28,7 @@ namespace BA_Socket {
         };
 
     public:
-        Event_Loop__Select(time_t sec = 0, suseconds_t usec = 0)
+        Event_Loop__Select__ST(time_t sec = 0, suseconds_t usec = 0)
             : _sec(sec), _usec(usec)
         {
             FD_ZERO(&_fd_set__read);
@@ -91,17 +91,6 @@ namespace BA_Socket {
         inline void run() override {
             _running.store(true);
 
-            // windows only:
-            //   Windows doesn't support fd_set for stdin.
-            //   So, a timeout loop is required.
-            struct timeval timeout;
-            timeval *timeout_ptr = nullptr;
-            if (_sec || _usec) {
-                timeout.tv_sec = _sec;
-                timeout.tv_usec = _usec;
-                timeout_ptr = &timeout;
-            }
-
             // main loop
             while (_running.load()) {
                 if (_fd_max < 0) break;
@@ -109,10 +98,16 @@ namespace BA_Socket {
                 // perform select operation
                 fd_set fd_set__read = _fd_set__read;
                 fd_set fd_set__write = _fd_set__write;
-                struct timeval timeout_;
-                if (timeout_ptr) {
-                    timeout_ = timeout;
-                    timeout_ptr = &timeout_;
+
+                // windows only:
+                //   Windows doesn't support fd_set for stdin.
+                //   So, a timeout loop is required.
+                struct timeval timeout;
+                struct timeval* timeout_ptr = nullptr;
+                if (_sec || _usec) {
+                    timeout.tv_sec  = _sec;
+                    timeout.tv_usec = _usec;
+                    timeout_ptr     = &timeout;
                 }
                 if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, timeout_ptr) < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
@@ -120,20 +115,8 @@ namespace BA_Socket {
                     break;
                 }
 
-                // collect the fd_set actions and the handler actions
-                // to apply after the loop of current handlers.
-                // the 1st bool parameter:
-                //   true: register fd / add handler
-                //   false: unregister fd / remove handler
-                using new_action_t = std::tuple<
-                    Enum_Register_Types,
-                    Enum_Handler_Action_Types,
-                    Enum_Event_Types,
-                    int,
-                    handler_ptr_t>;
-                std::vector<new_action_t> new_actions;
-
                 // execute _handler_entrys - read
+                reactor_command_pack_t reactor_commands;
                 for (auto& [fd, handler_entry] : _handler_entrys) {
                     // inspect the fd, the handler entry and the handler
                     if (!handler_entry._active) continue;
@@ -151,19 +134,12 @@ namespace BA_Socket {
                     if (!handler_ptr) continue;
 
                     // execute the handler
-                    handler_return_pack_t handler_return_pack = handler_ptr->apply();
-                    
-                    // loop through the handler return pack:
-                    for (auto& handler_return : handler_return_pack) {
-                        new_actions.push_back({
-                            handler_return.first._register_type,
-                            handler_return.first._handler_action_type,
-                            handler_return.first._event_type,
-                            handler_return.first._fd,
-                            std::move(handler_return.second) });
-                        if (handler_return.first._register_type == Enum_Register_Types::Unregister) {
+                    auto reactor_command_pack = handler_ptr->apply();
+                    for (auto& reactor_command : reactor_command_pack) {
+                        if (reactor_command._register_type == Enum_Register_Types::Unregister) {
                             handler_entry._active = false;
                         }
+                        reactor_commands.push_back(std::move(reactor_command));
                     }
                 }
 
@@ -177,24 +153,17 @@ namespace BA_Socket {
                     if (!handler_ptr) continue;
 
                     // execute the handler
-                    handler_return_pack_t handler_return_pack = handler_ptr->apply();
-
-                    // loop through the handler return pack:
-                    for (auto& handler_return : handler_return_pack) {
-                        new_actions.push_back({
-                            handler_return.first._register_type,
-                            handler_return.first._handler_action_type,
-                            handler_return.first._event_type,
-                            handler_return.first._fd,
-                            std::move(handler_return.second) });
-                        if (handler_return.first._register_type == Enum_Register_Types::Unregister) {
+                    auto reactor_command_pack = handler_ptr->apply();
+                    for (auto& reactor_command : reactor_command_pack) {
+                        if (reactor_command._register_type == Enum_Register_Types::Unregister) {
                             handler_entry._active = false;
                         }
+                        reactor_commands.push_back(std::move(reactor_command));
                     }
                 }
 
                 // update the fd_sets and the handler maps.
-                for (auto& [register_type, handler_action_type, event_type, fd, handler__new] : new_actions) {
+                for (auto& [fd, register_type, event_type, handler_command_type, handler__new] : reactor_commands) {
                     if (register_type == Enum_Register_Types::Unregister) {
                         fd_unregister(fd);
                         _handler_entrys.erase(fd);
@@ -203,8 +172,8 @@ namespace BA_Socket {
                         fd_register(fd, event_type);
                     }
                     if (
-                        handler_action_type == Enum_Handler_Action_Types::Add ||
-                        handler_action_type == Enum_Handler_Action_Types::Replace)
+                        handler_command_type == Enum_Handler_Command_Types::Add ||
+                        handler_command_type == Enum_Handler_Command_Types::Replace)
                     {
                         add_handler(std::move(handler__new), event_type);
                     }
@@ -227,4 +196,4 @@ namespace BA_Socket {
     };
 } // namespace BA_Socket
 
-#endif // EVENT_LOOP__SELECT_HPP
+#endif // EVENT_LOOP__SELECT__ST_HPP
