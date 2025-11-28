@@ -117,17 +117,56 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named BA_Socket
+# Target rules for targets named TCP_server__select__ST
 
 # Build rule for target.
-BA_Socket: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 BA_Socket
-.PHONY : BA_Socket
+TCP_server__select__ST: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_server__select__ST
+.PHONY : TCP_server__select__ST
 
 # fast build rule for target.
-BA_Socket/fast:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/BA_Socket.dir/build.make src/CMakeFiles/BA_Socket.dir/build
-.PHONY : BA_Socket/fast
+TCP_server__select__ST/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/build
+.PHONY : TCP_server__select__ST/fast
+
+#=============================================================================
+# Target rules for targets named TCP_server__select__MT
+
+# Build rule for target.
+TCP_server__select__MT: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_server__select__MT
+.PHONY : TCP_server__select__MT
+
+# fast build rule for target.
+TCP_server__select__MT/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/build
+.PHONY : TCP_server__select__MT/fast
+
+#=============================================================================
+# Target rules for targets named TCP_client__select__ST
+
+# Build rule for target.
+TCP_client__select__ST: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_client__select__ST
+.PHONY : TCP_client__select__ST
+
+# fast build rule for target.
+TCP_client__select__ST/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/build
+.PHONY : TCP_client__select__ST/fast
+
+#=============================================================================
+# Target rules for targets named TCP_client__select__MT
+
+# Build rule for target.
+TCP_client__select__MT: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_client__select__MT
+.PHONY : TCP_client__select__MT
+
+# fast build rule for target.
+TCP_client__select__MT/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/build
+.PHONY : TCP_client__select__MT/fast
 
 # Help Target
 help:
@@ -137,7 +176,10 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... BA_Socket"
+	@echo "... TCP_client__select__MT"
+	@echo "... TCP_client__select__ST"
+	@echo "... TCP_server__select__MT"
+	@echo "... TCP_server__select__ST"
 .PHONY : help
 
 

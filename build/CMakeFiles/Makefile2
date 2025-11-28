@@ -99,7 +99,10 @@ benchmark/clean:
 # Directory level rules for directory src
 
 # Recursive "all" directory target.
-src/all: src/CMakeFiles/BA_Socket.dir/all
+src/all: src/CMakeFiles/TCP_server__select__ST.dir/all
+src/all: src/CMakeFiles/TCP_server__select__MT.dir/all
+src/all: src/CMakeFiles/TCP_client__select__ST.dir/all
+src/all: src/CMakeFiles/TCP_client__select__MT.dir/all
 .PHONY : src/all
 
 # Recursive "preinstall" directory target.
@@ -107,7 +110,10 @@ src/preinstall:
 .PHONY : src/preinstall
 
 # Recursive "clean" directory target.
-src/clean: src/CMakeFiles/BA_Socket.dir/clean
+src/clean: src/CMakeFiles/TCP_server__select__ST.dir/clean
+src/clean: src/CMakeFiles/TCP_server__select__MT.dir/clean
+src/clean: src/CMakeFiles/TCP_client__select__ST.dir/clean
+src/clean: src/CMakeFiles/TCP_client__select__MT.dir/clean
 .PHONY : src/clean
 
 #=============================================================================
@@ -126,30 +132,108 @@ test/clean:
 .PHONY : test/clean
 
 #=============================================================================
-# Target rules for target src/CMakeFiles/BA_Socket.dir
+# Target rules for target src/CMakeFiles/TCP_server__select__ST.dir
 
 # All Build rule for target.
-src/CMakeFiles/BA_Socket.dir/all:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/BA_Socket.dir/build.make src/CMakeFiles/BA_Socket.dir/depend
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/BA_Socket.dir/build.make src/CMakeFiles/BA_Socket.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles --progress-num=1,2,3,4,5 "Built target BA_Socket"
-.PHONY : src/CMakeFiles/BA_Socket.dir/all
+src/CMakeFiles/TCP_server__select__ST.dir/all:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/depend
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles --progress-num=7,8 "Built target TCP_server__select__ST"
+.PHONY : src/CMakeFiles/TCP_server__select__ST.dir/all
 
 # Build rule for subdir invocation for target.
-src/CMakeFiles/BA_Socket.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 5
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/BA_Socket.dir/all
+src/CMakeFiles/TCP_server__select__ST.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_server__select__ST.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 0
-.PHONY : src/CMakeFiles/BA_Socket.dir/rule
+.PHONY : src/CMakeFiles/TCP_server__select__ST.dir/rule
 
 # Convenience name for target.
-BA_Socket: src/CMakeFiles/BA_Socket.dir/rule
-.PHONY : BA_Socket
+TCP_server__select__ST: src/CMakeFiles/TCP_server__select__ST.dir/rule
+.PHONY : TCP_server__select__ST
 
 # clean rule for target.
-src/CMakeFiles/BA_Socket.dir/clean:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/BA_Socket.dir/build.make src/CMakeFiles/BA_Socket.dir/clean
-.PHONY : src/CMakeFiles/BA_Socket.dir/clean
+src/CMakeFiles/TCP_server__select__ST.dir/clean:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/clean
+.PHONY : src/CMakeFiles/TCP_server__select__ST.dir/clean
+
+#=============================================================================
+# Target rules for target src/CMakeFiles/TCP_server__select__MT.dir
+
+# All Build rule for target.
+src/CMakeFiles/TCP_server__select__MT.dir/all:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/depend
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles --progress-num=5,6 "Built target TCP_server__select__MT"
+.PHONY : src/CMakeFiles/TCP_server__select__MT.dir/all
+
+# Build rule for subdir invocation for target.
+src/CMakeFiles/TCP_server__select__MT.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_server__select__MT.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 0
+.PHONY : src/CMakeFiles/TCP_server__select__MT.dir/rule
+
+# Convenience name for target.
+TCP_server__select__MT: src/CMakeFiles/TCP_server__select__MT.dir/rule
+.PHONY : TCP_server__select__MT
+
+# clean rule for target.
+src/CMakeFiles/TCP_server__select__MT.dir/clean:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/clean
+.PHONY : src/CMakeFiles/TCP_server__select__MT.dir/clean
+
+#=============================================================================
+# Target rules for target src/CMakeFiles/TCP_client__select__ST.dir
+
+# All Build rule for target.
+src/CMakeFiles/TCP_client__select__ST.dir/all:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/depend
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles --progress-num=3,4 "Built target TCP_client__select__ST"
+.PHONY : src/CMakeFiles/TCP_client__select__ST.dir/all
+
+# Build rule for subdir invocation for target.
+src/CMakeFiles/TCP_client__select__ST.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_client__select__ST.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 0
+.PHONY : src/CMakeFiles/TCP_client__select__ST.dir/rule
+
+# Convenience name for target.
+TCP_client__select__ST: src/CMakeFiles/TCP_client__select__ST.dir/rule
+.PHONY : TCP_client__select__ST
+
+# clean rule for target.
+src/CMakeFiles/TCP_client__select__ST.dir/clean:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/clean
+.PHONY : src/CMakeFiles/TCP_client__select__ST.dir/clean
+
+#=============================================================================
+# Target rules for target src/CMakeFiles/TCP_client__select__MT.dir
+
+# All Build rule for target.
+src/CMakeFiles/TCP_client__select__MT.dir/all:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/depend
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles --progress-num=1,2 "Built target TCP_client__select__MT"
+.PHONY : src/CMakeFiles/TCP_client__select__MT.dir/all
+
+# Build rule for subdir invocation for target.
+src/CMakeFiles/TCP_client__select__MT.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_client__select__MT.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles 0
+.PHONY : src/CMakeFiles/TCP_client__select__MT.dir/rule
+
+# Convenience name for target.
+TCP_client__select__MT: src/CMakeFiles/TCP_client__select__MT.dir/rule
+.PHONY : TCP_client__select__MT
+
+# clean rule for target.
+src/CMakeFiles/TCP_client__select__MT.dir/clean:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/clean
+.PHONY : src/CMakeFiles/TCP_client__select__MT.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.
