@@ -7,7 +7,6 @@
 #include "IEvent_Loop.hpp"
 #include <tuple>
 #include <unordered_map>
-#include <mutex>
 #include <atomic>
 
 namespace BA_Socket {

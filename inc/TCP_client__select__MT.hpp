@@ -4,10 +4,7 @@
 #define TCP_CLIENT__SELECT__MT_HPP
 
 #include "Event_Loop__Select__MT.hpp"
-#include "Concurrent_Queue_Blocking.hpp"
-#include "Thread_Pool__Blocking_Queue.hpp"
 #include <ctype.h>
-#include <algorithm>
 
 using namespace BA_Concurrency;
 
@@ -17,14 +14,16 @@ namespace BA_Socket {
         return true;
     }
 
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
     int TCP_client__select__MT_helper(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
     {
         using EL_t = Event_Loop__Select__MT<
-            Concurrent_Queue_Blocking,
-            Thread_Pool__Concurrent_Queue_Blocking>;
+            Concurrent_Queue_Type,
+            Thread_Pool_Type>;
 
         // obtain the peer address
         struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
@@ -74,13 +73,15 @@ namespace BA_Socket {
         return 0;
     }
     
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
     inline int TCP_client__select__MT(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
     {
         SOCKET_STARTUP();
-        int status = TCP_client__select__MT_helper(hostname, port, family);
+        int status = TCP_client__select__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>(hostname, port, family);
         SOCKET_CLEANUP();
         return status;
     }

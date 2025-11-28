@@ -4,8 +4,6 @@
 #define TCP_SERVER__SELECT__MT_HPP
 
 #include "Event_Loop__Select__MT.hpp"
-#include "Concurrent_Queue_Blocking.hpp"
-#include "Thread_Pool__Blocking_Queue.hpp"
 #include <ctype.h>
 #include <algorithm>
 
@@ -17,10 +15,12 @@ namespace BA_Socket {
         return true;
     }
 
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
     int TCP_server__select__MT_helper() {
         using EL_t = Event_Loop__Select__MT<
-            Concurrent_Queue_Blocking,
-            Thread_Pool__Concurrent_Queue_Blocking>;
+            Concurrent_Queue_Type,
+            Thread_Pool_Type>;
 
         // create the server socket and bind to the local address
         PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
@@ -49,9 +49,11 @@ namespace BA_Socket {
         return 0;
     }
     
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
     inline int TCP_server__select__MT() {
         SOCKET_STARTUP();
-        int status = TCP_server__select__MT_helper();
+        int status = TCP_server__select__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>();
         SOCKET_CLEANUP();
         return status;
     }

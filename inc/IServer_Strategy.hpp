@@ -3,7 +3,6 @@
 #ifndef ISERVER_STRATEGY_HPP
 #define ISERVER_STRATEGY_HPP
 
-#include <functional>
 #include "Socket.hpp"
 
 namespace BA_Socket {

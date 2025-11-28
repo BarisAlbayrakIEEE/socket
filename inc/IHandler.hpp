@@ -1,0 +1,64 @@
+// IHandler.hpp
+
+#ifndef IHANDLER_HPP
+#define IHANDLER_HPP
+
+#include "Reactor_Command.hpp"
+
+#define READ_LEN 4096
+#define HANDLER_RETURN_PACK__NONE()                            \
+    reactor_command_pack_t rcp{};                              \
+    rcp.emplace_back();                                        \
+    return rcp
+#define HANDLER_RETURN_PACK__UNREGISTER(fd__)                  \
+    reactor_command_pack_t rcp{};                              \
+    rcp.emplace_back(                                          \
+        (fd__),                                                \
+        Enum_Register_Types::Unregister,                       \
+        Enum_Event_Types::Read_Write,                          \
+        Enum_Handler_Command_Types::Remove,                    \
+        nullptr);                                              \
+    return rcp
+
+namespace BA_Socket {
+    // Handler interface
+    struct IHandler {
+        virtual ~IHandler() = default;
+        virtual int get_fd() const = 0;
+        virtual inline reactor_command_pack_t apply() const {
+            HANDLER_RETURN_PACK__NONE();
+        };
+    };
+
+    struct Job {
+        IHandler* _handler{};
+    };
+    using job_result_t = Reactor_Command;
+    using job_result_pack_t = std::vector<job_result_t>;
+
+    // forward declerations for the handlers
+    struct Handler_Write;
+    struct Handler_Redirect;
+    template <typename F>
+        requires CString_Forward<F>
+    struct Handler_Read_Forward;
+    struct Handler_Read_Redirect;
+    template <typename F, typename Next_Handler_Type>
+        requires
+            CString_Transform<F> &&
+            (
+                std::is_same_v<Next_Handler_Type, Handler_Write> ||
+                std::is_same_v<Next_Handler_Type, Handler_Redirect>)
+    struct Handler_Read_Transform;
+    template <typename F>
+        requires CString_Transform<F>
+    struct Handler_Read_Transform_Write;
+    template <typename F>
+        requires CString_Transform<F>
+    struct Handler_Read_Transform_Redirect;
+    template <typename Next_Handler_Type>
+        requires std::is_base_of_v<IHandler, Next_Handler_Type>
+    struct Handler_Accept;
+} // namespace BA_Socket
+
+#endif // IHANDLER_HPP

@@ -4,103 +4,12 @@
 #define HANDLER_HPP
 
 #include <functional>
-#include <vector>
-#include <memory>
 #include <utility>
-#include <type_traits>
-#include <concepts>
 #include "Socket.hpp"
-
-#define READ_LEN 4096
-#define HANDLER_RETURN_PACK__NONE()                      \
-    return reactor_command_pack_t{ Reactor_Command{} }
-#define HANDLER_RETURN_PACK__UNREGISTER(fd__)            \
-    return reactor_command_pack_t{                       \
-        Reactor_Command(                                 \
-            (fd__),                                      \
-            Enum_Register_Types::Unregister,             \
-            Enum_Event_Types::Read_Write,                \
-            Enum_Handler_Command_Types::Remove,           \
-            nullptr)                                     \
-    }
+#include "aux_type_traits.hpp"
+#include "IHandler.hpp"
 
 namespace BA_Socket {
-    template <typename F>
-    concept CString_Forward = 
-        requires (F f, const std::string& s) { { f(s) } -> std::same_as<bool>; };
-
-    template <typename F>
-    concept CString_Transform = 
-        requires (F f, std::string& s) { { f(s) } -> std::same_as<bool>; };
-    
-    using string_forward_t = bool(const std::string&);
-    using string_transform_t = bool(std::string&);
-
-    enum class Enum_Register_Types { None, Register, Unregister };
-    enum class Enum_Handler_Command_Types { None, Add, Remove, Replace };
-    enum class Enum_Event_Types { None, Read, Write, Read_Write }; // Read_Write is for unregister op
-    const std::string INFO_WRONG_DATA = "Wrong data for the request";
-
-    struct IHandler;
-    using handler_ptr_t = std::unique_ptr<IHandler>;
-
-    struct Reactor_Command{
-        int _fd{-1};
-        Enum_Register_Types _register_type{ Enum_Register_Types::None };
-        Enum_Event_Types _event_type{ Enum_Event_Types::None };
-        Enum_Handler_Command_Types _handler_command_type{ Enum_Handler_Command_Types::None };
-        handler_ptr_t _handler_ptr;
-
-        Reactor_Command() = default;
-        Reactor_Command(
-            int fd,
-            Enum_Register_Types register_type,
-            Enum_Event_Types event_type,
-            Enum_Handler_Command_Types handler_command_type,
-            handler_ptr_t&& handler_ptr)
-            :
-            _fd(fd),
-            _register_type(register_type),
-            _event_type(event_type),
-            _handler_command_type(handler_command_type),
-            _handler_ptr(std::move(handler_ptr)) {};
-    };
-
-    using reactor_command_pack_t = std::vector<Reactor_Command>;
-
-    // Handler interface
-    struct IHandler {
-        virtual ~IHandler() = default;
-        virtual int get_fd() const = 0;
-        virtual inline reactor_command_pack_t apply() const {
-            HANDLER_RETURN_PACK__NONE();
-        };
-    };
-
-    // forward declerations
-    struct Handler_Write;
-    struct Handler_Redirect;
-    template <typename F>
-        requires CString_Forward<F>
-    struct Handler_Read_Forward;
-    struct Handler_Read_Redirect;
-    template <typename F, typename Next_Handler_Type>
-        requires
-            CString_Transform<F> &&
-            (
-                std::is_same_v<Next_Handler_Type, Handler_Write> ||
-                std::is_same_v<Next_Handler_Type, Handler_Redirect>)
-    struct Handler_Read_Transform;
-    template <typename F>
-        requires CString_Transform<F>
-    struct Handler_Read_Transform_Write;
-    template <typename F>
-        requires CString_Transform<F>
-    struct Handler_Read_Transform_Redirect;
-    template <typename Next_Handler_Type>
-        requires std::is_base_of_v<IHandler, Next_Handler_Type>
-    struct Handler_Accept;
-
     // read helper function
     inline bool read_helper(int fd, std::string& buffer) {
         buffer.resize(READ_LEN);
@@ -217,8 +126,9 @@ namespace BA_Socket {
         
         reactor_command_pack_t apply() const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer))
+            if (!read_helper(_fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            }
 
             // forward the recieved data to function F
             PRINTF1("[Handler]: Forwarding the recieved data to function F...\n");
@@ -256,8 +166,9 @@ namespace BA_Socket {
 
         reactor_command_pack_t apply() const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer))
+            if (!read_helper(_fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            }
 
             // redirect the data to the contained fds
             PRINTF1("[Handler]: Redirecting the data to the ...\n");
@@ -300,8 +211,9 @@ namespace BA_Socket {
         
         reactor_command_pack_t apply() const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer))
+            if (!read_helper(_fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            }
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -313,13 +225,14 @@ namespace BA_Socket {
             }
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    _fd,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Write,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Write>(_fd, std::move(buffer))) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                _fd,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Write,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Write>(_fd, std::move(buffer)));
+            return rcp;
         };
     };
 
@@ -350,8 +263,9 @@ namespace BA_Socket {
 
         reactor_command_pack_t apply() const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer))
+            if (!read_helper(_fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            }
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -363,13 +277,14 @@ namespace BA_Socket {
             }
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    _fd,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Write,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Redirect>(_fd, std::move(buffer), _fds)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                _fd,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Write,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Redirect>(_fd, std::move(buffer), _fds));
+            return rcp;
         };
     };
 
@@ -395,8 +310,9 @@ namespace BA_Socket {
 
         reactor_command_pack_t apply() const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer))
+            if (!read_helper(_fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            }
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -442,8 +358,9 @@ namespace BA_Socket {
 
         reactor_command_pack_t apply() const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer))
+            if (!read_helper(_fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            }
 
             // transform the recieved data by function F
             PRINTF1("[Handler]: Transforming the recieved data by function F...\n");
@@ -506,13 +423,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    fd_client,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Write,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Write>(fd_client, _buffer)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                fd_client,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Write,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Write>(fd_client, _buffer));
+            return rcp;
         };
     };
 
@@ -553,13 +471,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    fd_client,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Read,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Read_Forward<F>>(fd_client, _forwarder)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                fd_client,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Read,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Read_Forward<F>>(fd_client, _forwarder));
+            return rcp;
         };
     };
 
@@ -601,13 +520,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    fd_client,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Read,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Read_Redirect>(fd_client, _fds)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                fd_client,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Read,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Read_Redirect>(fd_client, _fds));
+            return rcp;
         };
     };
 
@@ -648,13 +568,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    fd_client,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Read,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Read_Transform<F, Handler_Write>>(fd_client, _transformer)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                fd_client,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Read,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Read_Transform<F, Handler_Write>>(fd_client, _transformer));
+            return rcp;
         };
     };
 
@@ -698,13 +619,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    fd_client,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Read,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Read_Transform<F, Handler_Redirect>>(fd_client, _transformer, _fds)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                fd_client,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Read,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Read_Transform<F, Handler_Redirect>>(fd_client, _transformer, _fds));
+            return rcp;
         };
     };
 
@@ -745,13 +667,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    fd_client,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Read,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Read_Transform_Write<F>>(fd_client, _transformer)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                fd_client,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Read,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Read_Transform_Write<F>>(fd_client, _transformer));
+            return rcp;
         };
     };
 
@@ -795,13 +718,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            return reactor_command_pack_t{
-                Reactor_Command(
-                    fd_client,
-                    Enum_Register_Types::Register,
-                    Enum_Event_Types::Read,
-                    Enum_Handler_Command_Types::Add,
-                    std::make_unique<Handler_Read_Transform_Redirect<F>>(fd_client, _transformer, _fds)) };
+            reactor_command_pack_t rcp{};
+            rcp.emplace_back(
+                fd_client,
+                Enum_Register_Types::Register,
+                Enum_Event_Types::Read,
+                Enum_Handler_Command_Types::Add,
+                std::make_unique<Handler_Read_Transform_Redirect<F>>(fd_client, _transformer, _fds));
+            return rcp;
         };
     };
 } // namespace BA_Socket

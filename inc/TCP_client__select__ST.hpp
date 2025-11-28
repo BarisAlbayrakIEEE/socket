@@ -5,7 +5,6 @@
 
 #include "Event_Loop__Select__ST.hpp"
 #include <ctype.h>
-#include <algorithm>
 
 namespace BA_Socket {
     inline bool write_to_stdout(const std::string& buffer) {
