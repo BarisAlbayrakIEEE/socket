@@ -3,11 +3,9 @@
 #ifndef SOCKET_HPP
 #define SOCKET_HPP
 
-#include "utility_addr.hpp"
 #include <stdexcept>
 #include <utility>
-#include <cstring>
-#include <stdio.h>
+#include "utility_addr.hpp"
 
 namespace BA_Socket {
     class Socket {

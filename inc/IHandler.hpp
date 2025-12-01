@@ -4,6 +4,7 @@
 #define IHANDLER_HPP
 
 #include "Reactor_Command.hpp"
+#include "aux_type_traits.hpp"
 
 #define READ_LEN 4096
 #define HANDLER_RETURN_PACK__NONE()                            \
@@ -27,6 +28,21 @@ namespace BA_Socket {
         virtual inline reactor_command_pack_t apply(int fd) const {
             HANDLER_RETURN_PACK__NONE();
         };
+    };
+
+    struct Handler_Entry {
+        handler_ptr_t _handler__read{ nullptr };
+        handler_ptr_t _handler__write{ nullptr };
+        bool _active{ true };
+
+        Handler_Entry(
+            handler_ptr_t handler__read = nullptr,
+            handler_ptr_t handler__write = nullptr,
+            bool active = true)
+            :
+            _handler__read(std::move(handler__read)),
+            _handler__write(std::move(handler__write)),
+            _active(active) {}                
     };
 
     struct Job {

@@ -4,7 +4,6 @@
 #define UTILITY_ADDR_HPP
 
 #include "socket_setup.hpp"
-#include <cstring>
 #ifdef _WIN32
     #include <iphlpapi.h>
 #else

@@ -3,9 +3,9 @@
 #ifndef REACTOR_COMMAND_HPP
 #define REACTOR_COMMAND_HPP
 
-#include "core.hpp"
 #include <memory>
 #include <vector>
+#include "core.hpp"
 
 namespace BA_Socket {
     struct IHandler;

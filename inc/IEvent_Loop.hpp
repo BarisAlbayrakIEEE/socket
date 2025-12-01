@@ -3,7 +3,7 @@
 #ifndef IEVENT_LOOP_HPP
 #define IEVENT_LOOP_HPP
 
-#include "Handler.hpp"
+#include "core.hpp"
 
 namespace BA_Socket {
     // Event loop interface

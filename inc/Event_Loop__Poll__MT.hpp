@@ -1,14 +1,15 @@
-// Event_Loop__Select__MT.hpp
-// Multi-threaded select event loop
+// Event_Loop__Poll__MT.hpp
+// Multi-threaded poll event loop
 
-#ifndef EVENT_LOOP__SELECT__MT_HPP
-#define EVENT_LOOP__SELECT__MT_HPP
+#ifndef EVENT_LOOP__POLL__MT_HPP
+#define EVENT_LOOP__POLL__MT_HPP
 
 #include <unordered_map>
-#include <mutex>
+#include <vector>
 #include <atomic>
 #include <thread>
 #include <optional>
+#include "poll_setup.hpp"
 #include "IEvent_Loop.hpp"
 #include "Handler.hpp"
 
@@ -26,9 +27,9 @@ namespace BA_Socket {
 
     template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
         requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    class Event_Loop__Select__MT : public IEvent_Loop {
+    class Event_Loop__Poll__MT : public IEvent_Loop {
     public:
-        Event_Loop__Select__MT(
+        Event_Loop__Poll__MT(
             time_t sec = 0,
             suseconds_t usec = 0,
             size_t thread_count = std::thread::hardware_concurrency())
@@ -41,43 +42,39 @@ namespace BA_Socket {
         inline void fd_register(int fd, Enum_Event_Types event_type) override {
             if (event_type == Enum_Event_Types::None) return;
 
+            short events = 0;
             if (event_type == Enum_Event_Types::Read) {
-                FD_SET(fd, &_fd_set__read);
+                events |= POLL_IN;
+            } else if (event_type == Enum_Event_Types::Write) {
+                events |= POLL_OUT;
+            } else { // Read_Write
+                events |= POLL_IN | POLL_OUT;
             }
-            else if (event_type == Enum_Event_Types::Write) {
-                FD_SET(fd, &_fd_set__write);
+
+            // update or add pollfd
+            auto it = std::find_if(
+                _pollfds.begin(),
+                _pollfds.end(),
+                [fd](const auto& pollfd_){ return pollfd_.fd == fd; });
+            if (it != _pollfds.end()) {
+                it->events |= events;
+            } else {
+                pollfd_t pollfd_{};
+                pollfd_.fd = fd;
+                pollfd_.events = events;
+                pollfd_.revents = 0;
+                _pollfds.push_back(pollfd_);
             }
-            else { // if (event_type == Enum_Event_Types::Read_Write) {
-                FD_SET(fd, &_fd_set__read);
-                FD_SET(fd, &_fd_set__write);
-            }
-            if (fd > _fd_max) _fd_max = fd;
         }
 
         inline void fd_unregister(int fd) override {
-            FD_CLR(fd, &_fd_set__read);
-            FD_CLR(fd, &_fd_set__write);
-            if (fd == _fd_max) {
-                auto fd_max = _fd_max;
-                _fd_max = -1;
-                for(SOCKET fdi = 0; fdi <= fd_max; ++fdi) {
-                    if (FD_ISSET(fdi, &_fd_set__read)) {
-                        if (fdi > _fd_max) _fd_max = fdi;
-                    }
-                    if (FD_ISSET(fdi, &_fd_set__write)) {
-                        if (fdi > _fd_max) _fd_max = fdi;
-                    }
-                }
-            }
+            _pollfds.erase(
+                std::remove_if(
+                    _pollfds.begin(),
+                    _pollfds.end(),
+                    [fd](const pollfd_t& pollfd_){ return pollfd_.fd == fd; }),
+                _pollfds.end());
             _handler_entrys.erase(fd);
-        }
-
-        inline void add_stdin_to_reads() {
-            FD_SET(0, &_fd_set__read);
-        }
-
-        inline void add_stdout_to_writes() {
-            FD_SET(1, &_fd_set__write);
         }
 
         inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
@@ -97,32 +94,23 @@ namespace BA_Socket {
 
             // main loop
             while (_running.load()) {
-                if (_fd_max < 0) break;
+                if (_pollfds.empty()) break;
 
-                // copy fd_sets
-                fd_set fd_set__read = _fd_set__read;
-                fd_set fd_set__write = _fd_set__write;
-
-                // windows only:
-                //   Windows doesn't support fd_set for stdin.
-                //   So, a timeout loop is required.
-                struct timeval timeout;
-                struct timeval* timeout_ptr = nullptr;
-                if (_sec || _usec) {
-                    timeout.tv_sec  = _sec;
-                    timeout.tv_usec = _usec;
-                    timeout_ptr     = &timeout;
-                }
-
-                // perform select operation
-                if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, timeout_ptr) < 0) {
+                // perform poll operation
+                std::vector<pollfd_t> pollfds_copy = _pollfds;
+                int status = poll_execute(
+                    pollfds_copy.data(),
+                    static_cast<nfds_t>(pollfds_copy.size()),
+                    _msec);
+                if (status < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
-                    SOCKET_ERROR__SELECT();
+                    SOCKET_ERROR__POLL();
                     break;
                 }
+                if (status == 0) continue; // timeout
 
                 // create jobs from the current handler entry map
-                create_jobs(fd_set__read, fd_set__write);
+                create_jobs(pollfds_copy);
 
                 // submit the jobs via the thread pool - multiple threads
                 submit_jobs();
@@ -138,57 +126,37 @@ namespace BA_Socket {
 
     private:
 
-        // get handler from the handler entry
-        inline IHandler* get_handler_ptr(
-            int fd,
-            fd_set fd_set__read,
-            fd_set fd_set__write,
-            Handler_Entry& handler_entry,
-            Enum_Event_Types event_type)
-        {
-            if (!IS_VALID_SOCKET(fd)) return nullptr;
-            if (!handler_entry._active) return nullptr;
-            IHandler *handler_ptr{ nullptr };
-            if (event_type == Enum_Event_Types::Read) {
+        // get the handler entry from the pollfd
+        inline Handler_Entry* get_handler_entry_ptr(const pollfd_t & pollfd_) {
+            if (pollfd_.revents == 0) return nullptr;
+            if (!IS_VALID_SOCKET(pollfd_.fd)) return nullptr;
 #if defined(_WIN32)
-                if (fd == 0) {
-                    if (!_kbhit()) return nullptr;
-                } else {
-                    if (!FD_ISSET(fd, &fd_set__read)) return nullptr;
-                }
-#else
-                if (!FD_ISSET(fd, &fd_set__read)) return nullptr;
+            if (pollfd_.fd == 0 && !_kbhit()) return nullptr;
 #endif
-                handler_ptr = handler_entry._handler__read.get();
-            }
-            else if (event_type == Enum_Event_Types::Write) {
-                if (!FD_ISSET(fd, &fd_set__write)) return nullptr;
-                handler_ptr = handler_entry._handler__write.get();
-            }
-            return handler_ptr;
+
+            auto it = _handler_entrys.find(pollfd_.fd);
+            if (it == _handler_entrys.end()) return nullptr;
+            auto& handler_entry = it->second;
+            if (!handler_entry._active) return nullptr;
+            return &handler_entry;
         }
 
         // create jobs from the current handler entry map
-        inline void create_jobs(fd_set fd_set__read, fd_set fd_set__write) {
-            create_jobs_helper(fd_set__read, fd_set__write, Enum_Event_Types::Read);
-            create_jobs_helper(fd_set__read, fd_set__write, Enum_Event_Types::Write);
-        }
-
-        // create jobs from the current handler entry map - helper
-        void create_jobs_helper(
-            fd_set fd_set__read,
-            fd_set fd_set__write,
-            Enum_Event_Types event_type)
+        void create_jobs(
+            const std::vector<pollfd_t>& pollfds_copy)
         {
-            for (auto& [fd, handler_entry] : _handler_entrys) {
-                auto handler_ptr = get_handler_ptr(
-                    fd,
-                    fd_set__read,
-                    fd_set__write,
-                    handler_entry,
-                    event_type);
-                if (!handler_ptr) continue;
-                _jobs.push(Job(fd, handler_ptr));
+            for (const auto& pollfd_ : pollfds_copy) {
+                // get the handler entry from the pollfd
+                auto handler_entry_ptr = get_handler_entry_ptr(pollfd_);
+                if (!handler_entry_ptr) continue;
+
+                // add the new jobs into _jobs
+                if ((pollfd_.revents & POLL_IN) && handler_entry_ptr->_handler__read) {
+                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__read));
+                }
+                if ((pollfd_.revents & POLL_OUT) && handler_entry_ptr->_handler__write) {
+                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__write));
+                }
             }
         }
 
@@ -237,16 +205,13 @@ namespace BA_Socket {
         }
 
         std::unordered_map<int, Handler_Entry> _handler_entrys;
+        std::vector<pollfd_t> _pollfds;
         Concurrent_Queue_Type<Job> _jobs;
         Concurrent_Queue_Type<job_result_t> _job_results;
         Thread_Pool_Type _tp;
-        fd_set _fd_set__read;
-        fd_set _fd_set__write;
-        time_t _sec{0};
-        suseconds_t _usec{0};
-        int _fd_max = -1;
-        std::atomic<bool> _running{false};
+        int _msec{ -1 };
+        std::atomic<bool> _running{ false };
     };
 } // namespace BA_Socket
 
-#endif // EVENT_LOOP__SELECT__MT_HPP
+#endif // EVENT_LOOP__POLL__MT_HPP

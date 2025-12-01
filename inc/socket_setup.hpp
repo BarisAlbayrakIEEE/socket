@@ -44,6 +44,9 @@
 
     #define ERROR_INTERRUPTED  (WSAEINTR)
     #define ERROR_BLOCKED      (WSAEWOULDBLOCK)
+
+    #define SOCKET_ERROR__POLL() \
+        fprintf(stderr, "[WSAPoll() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -65,6 +68,9 @@
 
     #define ERROR_INTERRUPTED  (EINTR)
     #define ERROR_BLOCKED      (EAGAIN)
+
+    #define SOCKET_ERROR__POLL() \
+        fprintf(stderr, "[poll() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #endif
 #if !defined(IPV6_V6ONLY)
     #define IPV6_V6ONLY 27

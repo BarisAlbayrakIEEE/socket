@@ -3,12 +3,10 @@
 #ifndef EVENT_LOOP__EPOLL_HPP
 #define EVENT_LOOP__EPOLL_HPP
 
-#include "IEvent_Loop.hpp"
-#include <sys/epoll.h>
-#include <unistd.h>
 #include <mutex>
 #include <atomic>
 #include <unordered_map>
+#include "IEvent_Loop.hpp"
 
 namespace BA_Socket {
     class Event_Loop__Epoll : public IEvent_Loop {

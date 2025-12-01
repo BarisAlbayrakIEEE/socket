@@ -1,0 +1,8 @@
+#define BA_Socket_VERSION_MAJOR @BA_Socket_VERSION_MAJOR@ 
+#define BA_Socket_VERSION_MINOR @BA_Socket_VERSION_MAJOR@
+
+
+#define BA_Socket_VERSION_MAJOR 1 
+#define BA_Socket_VERSION_MINOR 1
+
+
