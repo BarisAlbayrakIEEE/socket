@@ -61,12 +61,14 @@ namespace BA_Socket {
         EL_t el{ 0, 100000 };
         el.add_stdin_to_reads();
         el.add_handler(
-            std::make_unique<Handler_Read_Redirect>(0, std::vector<int>{ fd_peer }),
+            0,
+            std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
             Enum_Event_Types::Read);
 
         el.fd_register(fd_peer, Enum_Event_Types::Read);
         el.add_handler(
-            std::make_unique<Handler_Read_Forward<string_forward_t>>(fd_peer, &write_to_stdout),
+            fd_peer,
+            std::make_unique<Handler_Read_Forward<string_forward_t>>(&write_to_stdout),
             Enum_Event_Types::Read);
         el.run();
 
