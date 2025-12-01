@@ -3,6 +3,7 @@
 #ifndef TCP_CLIENT__SELECT__ST_HPP
 #define TCP_CLIENT__SELECT__ST_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__ST.hpp"
 #include <ctype.h>
 
@@ -51,7 +52,7 @@ namespace BA_Socket {
 
         // create the event looop
         Event_Loop__Select__ST el{ 0, 100000 };
-        el.add_stdin_to_reads();
+        el.fd_register(0, Enum_Event_Types::Read);
         el.add_handler(
             0,
             std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
@@ -66,7 +67,7 @@ namespace BA_Socket {
 
         return 0;
     }
-    
+
     inline int TCP_client__select__ST(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,

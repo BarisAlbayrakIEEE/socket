@@ -19,8 +19,8 @@ namespace BA_Socket {
         Concurrent_Queue_Type<job_result_t>& job_results)
     {
         auto rcp = std::move(job._handler->apply(job._fd));
-        for (auto& reactor_command : rcp) {
-            job_results.push(std::move(reactor_command));
+        for (auto& rc : rcp) {
+            job_results.push(std::move(rc));
         }
     };
 
@@ -70,14 +70,6 @@ namespace BA_Socket {
                 }
             }
             _handler_entrys.erase(fd);
-        }
-
-        inline void add_stdin_to_reads() {
-            FD_SET(0, &_fd_set__read);
-        }
-
-        inline void add_stdout_to_writes() {
-            FD_SET(1, &_fd_set__write);
         }
 
         inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {

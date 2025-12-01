@@ -3,6 +3,7 @@
 #ifndef TCP_CLIENT__SELECT__MT_HPP
 #define TCP_CLIENT__SELECT__MT_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__MT.hpp"
 #include <ctype.h>
 
@@ -58,8 +59,8 @@ namespace BA_Socket {
         PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // create the event looop
-        EL_t el{ 0, 100000 };
-        el.add_stdin_to_reads();
+        EL_t el{ 0, 100000, std::thread::hardware_concurrency() };
+        el.fd_register(0, Enum_Event_Types::Read);
         el.add_handler(
             0,
             std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),

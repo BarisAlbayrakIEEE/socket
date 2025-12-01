@@ -53,14 +53,6 @@ namespace BA_Socket {
             _handler_entrys.erase(fd);
         }
 
-        inline void add_stdin_to_reads() {
-            FD_SET(0, &_fd_set__read);
-        }
-
-        inline void add_stdout_to_writes() {
-            FD_SET(1, &_fd_set__write);
-        }
-
         inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
             if (!handler) return;
             if (event_type == Enum_Event_Types::None) return;
@@ -176,11 +168,11 @@ namespace BA_Socket {
 
                 // execute the handler
                 auto rcp = handler_ptr->apply(fd);
-                for (auto& reactor_command : rcp) {
-                    if (reactor_command._register_type == Enum_Register_Types::Unregister) {
+                for (auto& rc : rcp) {
+                    if (rc._register_type == Enum_Register_Types::Unregister) {
                         handler_entry._active = false;
                     }
-                    rcp_next.push_back(std::move(reactor_command));
+                    rcp_next.push_back(std::move(rc));
                 }
             }
         }

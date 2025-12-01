@@ -3,8 +3,8 @@
 #ifndef TCP_CLIENT__POLL__ST_HPP
 #define TCP_CLIENT__POLL__ST_HPP
 
-#include "Event_Loop__Poll__ST.hpp"
 #include "Socket.hpp"
+#include "Event_Loop__Poll__ST.hpp"
 #include <ctype.h>
 
 namespace BA_Socket {
@@ -51,8 +51,8 @@ namespace BA_Socket {
         PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // create the event looop
-        Event_Loop__Poll__ST el{ 0, 100000 };
-        el.add_stdin_to_reads();
+        Event_Loop__Poll__ST el{ 100 };
+        el.fd_register(0, Enum_Event_Types::Read);
         el.add_handler(
             0,
             std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),

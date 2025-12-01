@@ -20,8 +20,8 @@ namespace BA_Socket {
         Concurrent_Queue_Type<job_result_t>& job_results)
     {
         auto rcp = std::move(job._handler->apply(job._fd));
-        for (auto& reactor_command : rcp) {
-            job_results.push(std::move(reactor_command));
+        for (auto& rc : rcp) {
+            job_results.push(std::move(rc));
         }
     };
 
@@ -30,14 +30,9 @@ namespace BA_Socket {
     class Event_Loop__Poll__MT : public IEvent_Loop {
     public:
         Event_Loop__Poll__MT(
-            time_t sec = 0,
-            suseconds_t usec = 0,
+            int msec = -1,
             size_t thread_count = std::thread::hardware_concurrency())
-                : _sec(sec), _usec(usec), _tp(thread_count == 0 ? 1 : thread_count)
-        {
-            FD_ZERO(&_fd_set__read);
-            FD_ZERO(&_fd_set__write);
-        }
+                : _msec(msec), _tp(thread_count == 0 ? 1 : thread_count) {}
 
         inline void fd_register(int fd, Enum_Event_Types event_type) override {
             if (event_type == Enum_Event_Types::None) return;

@@ -3,8 +3,8 @@
 #ifndef TCP_SERVER__POLL__ST_HPP
 #define TCP_SERVER__POLL__ST_HPP
 
-#include "Event_Loop__Poll__ST.hpp"
 #include "Socket.hpp"
+#include "Event_Loop__Poll__ST.hpp"
 #include <ctype.h>
 #include <algorithm>
 

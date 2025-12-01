@@ -127,22 +127,22 @@ namespace BA_Socket {
                 // execute the read handler
                 if ((pollfd_.revents & POLL_IN) && handler_entry_ptr->_handler__read) {
                     auto rcp = handler_entry_ptr->_handler__read->apply(pollfd_.fd);
-                    for (auto& cmd : rcp) {
-                        if (cmd._register_type == Enum_Register_Types::Unregister) {
+                    for (auto& rc : rcp) {
+                        if (rc._register_type == Enum_Register_Types::Unregister) {
                             handler_entry_ptr->_active = false;
                         }
-                        rcp_next.push_back(std::move(cmd));
+                        rcp_next.push_back(std::move(rc));
                     }
                 }
 
                 // execute the write handler
                 if ((pollfd_.revents & POLL_OUT) && handler_entry_ptr->_handler__write) {
                     auto rcp = handler_entry_ptr->_handler__write->apply(pollfd_.fd);
-                    for (auto& cmd : rcp) {
-                        if (cmd._register_type == Enum_Register_Types::Unregister) {
+                    for (auto& rc : rcp) {
+                        if (rc._register_type == Enum_Register_Types::Unregister) {
                             handler_entry_ptr->_active = false;
                         }
-                        rcp_next.push_back(std::move(cmd));
+                        rcp_next.push_back(std::move(rc));
                     }
                 }
             }

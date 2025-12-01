@@ -3,6 +3,7 @@
 #ifndef TCP_SERVER__SELECT__ST_HPP
 #define TCP_SERVER__SELECT__ST_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__ST.hpp"
 #include <ctype.h>
 #include <algorithm>

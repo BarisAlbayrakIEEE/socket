@@ -3,6 +3,7 @@
 #ifndef TCP_SERVER__SELECT__MT_HPP
 #define TCP_SERVER__SELECT__MT_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__MT.hpp"
 #include <ctype.h>
 #include <algorithm>
