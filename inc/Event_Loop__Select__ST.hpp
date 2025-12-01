@@ -75,15 +75,15 @@ namespace BA_Socket {
             FD_SET(1, &_fd_set__write);
         }
 
-        inline void add_handler(handler_ptr_t&& handler, Enum_Event_Types event_type) {
+        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
             if (!handler) return;
             if (event_type == Enum_Event_Types::None) return;
 
             if (event_type == Enum_Event_Types::Read) {
-                _handler_entrys[handler->get_fd()]._handler__read = std::move(handler);
+                _handler_entrys[fd]._handler__read = std::move(handler);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                _handler_entrys[handler->get_fd()]._handler__write = std::move(handler);
+                _handler_entrys[fd]._handler__write = std::move(handler);
             }
         }
 
@@ -133,7 +133,7 @@ namespace BA_Socket {
                     if (!handler_ptr) continue;
 
                     // execute the handler
-                    auto reactor_command_pack = handler_ptr->apply();
+                    auto reactor_command_pack = handler_ptr->apply(fd);
                     for (auto& reactor_command : reactor_command_pack) {
                         if (reactor_command._register_type == Enum_Register_Types::Unregister) {
                             handler_entry._active = false;
@@ -152,7 +152,7 @@ namespace BA_Socket {
                     if (!handler_ptr) continue;
 
                     // execute the handler
-                    auto reactor_command_pack = handler_ptr->apply();
+                    auto reactor_command_pack = handler_ptr->apply(fd);
                     for (auto& reactor_command : reactor_command_pack) {
                         if (reactor_command._register_type == Enum_Register_Types::Unregister) {
                             handler_entry._active = false;
@@ -174,7 +174,7 @@ namespace BA_Socket {
                         handler_command_type == Enum_Handler_Command_Types::Add ||
                         handler_command_type == Enum_Handler_Command_Types::Replace)
                     {
-                        add_handler(std::move(handler__new), event_type);
+                        add_handler(fd, std::move(handler__new), event_type);
                     }
                 }
             }

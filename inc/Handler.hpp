@@ -51,20 +51,17 @@ namespace BA_Socket {
     // Handler command:
     //   None
     struct Handler_Write : public IHandler {
-        int _fd{-1};
         std::string _buffer{};
 
-        Handler_Write(int fd, const std::string& buffer)
-            : _fd(fd), _buffer(buffer) {};
-        Handler_Write(int fd, std::string&& buffer)
-            : _fd(fd), _buffer(std::move(buffer)) {};
+        explicit Handler_Write(const std::string& buffer)
+            : _buffer(buffer) {};
+        explicit Handler_Write(std::string&& buffer)
+            : _buffer(std::move(buffer)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // send the data to the peer
             PRINTF1("[Handler]: Sending the data to the peer...\n");
-            ::send(_fd, _buffer.c_str(), _buffer.size(), 0);
+            ::send(fd, _buffer.c_str(), _buffer.size(), 0);
             PRINTF4("[Handler]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
 
             // return the handler pack
@@ -80,18 +77,15 @@ namespace BA_Socket {
     // Handler command:
     //   None
     struct Handler_Redirect : public IHandler {
-        int _fd{-1};
         std::string _buffer{};
         std::vector<int> _fds{};
 
-        Handler_Redirect(int fd, const std::string& buffer, const std::vector<int>& fds)
-            : _fd(fd), _buffer(buffer), _fds(fds) {};
-        Handler_Redirect(int fd, std::string&& buffer, std::vector<int>&& fds)
-            : _fd(fd), _buffer(std::move(buffer)), _fds(std::move(fds)) {};
+        Handler_Redirect(const std::string& buffer, const std::vector<int>& fds)
+            : _buffer(buffer), _fds(fds) {};
+        Handler_Redirect(std::string&& buffer, std::vector<int>&& fds)
+            : _buffer(std::move(buffer)), _fds(std::move(fds)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        inline reactor_command_pack_t apply() const override {
+        inline reactor_command_pack_t apply(int fd) const override {
             // send the data to the peer
             PRINTF1("[Handler]: Sending the data to the peer...\n");
             for (const auto& fd_: _fds) {
@@ -116,18 +110,15 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Forward<F>
     struct Handler_Read_Forward : public IHandler {
-        int _fd{-1};
         F const* _forwarder{};
 
-        Handler_Read_Forward(int fd, F const* forwarder)
-            : _fd(fd), _forwarder(forwarder) {};
-
-        inline int get_fd() const override { return _fd; };
+        explicit Handler_Read_Forward(F const* forwarder)
+            : _forwarder(forwarder) {};
         
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer)) {
-                HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            if (!read_helper(fd, buffer)) {
+                HANDLER_RETURN_PACK__UNREGISTER(fd);
             }
 
             // forward the recieved data to function F
@@ -135,7 +126,7 @@ namespace BA_Socket {
             if (!(*_forwarder)(buffer)) {
                 // send the info for the failed forwarding (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed forwarding (wrong input data) to the peer...\n");
-                ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
+                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 HANDLER_RETURN_PACK__NONE();
             }
 
@@ -154,20 +145,17 @@ namespace BA_Socket {
     // Handler command:
     //   None
     struct Handler_Read_Redirect : public IHandler {
-        int _fd{-1};
         std::vector<int> _fds{};
 
-        Handler_Read_Redirect(int fd, const std::vector<int>& fds)
-            : _fd(fd), _fds(fds) {};
-        Handler_Read_Redirect(int fd, std::vector<int>&& fds)
-            : _fd(fd), _fds(std::move(fds)) {};
+        explicit Handler_Read_Redirect(const std::vector<int>& fds)
+            : _fds(fds) {};
+        explicit Handler_Read_Redirect(std::vector<int>&& fds)
+            : _fds(std::move(fds)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer)) {
-                HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            if (!read_helper(fd, buffer)) {
+                HANDLER_RETURN_PACK__UNREGISTER(fd);
             }
 
             // redirect the data to the contained fds
@@ -201,18 +189,15 @@ namespace BA_Socket {
                 std::is_same_v<Next_Handler_Type, Handler_Write> ||
                 std::is_same_v<Next_Handler_Type, Handler_Redirect>)
     struct Handler_Read_Transform : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
 
-        Handler_Read_Transform(int fd, F const* transformer)
-            : _fd(fd), _transformer(transformer) {};
-
-        inline int get_fd() const override { return _fd; };
+        explicit Handler_Read_Transform(F const* transformer)
+            : _transformer(transformer) {};
         
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer)) {
-                HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            if (!read_helper(fd, buffer)) {
+                HANDLER_RETURN_PACK__UNREGISTER(fd);
             }
 
             // transform the recieved data by function F
@@ -220,18 +205,18 @@ namespace BA_Socket {
             if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
-                ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
+                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 HANDLER_RETURN_PACK__NONE();
             }
 
             // return the handler pack
             reactor_command_pack_t rcp{};
             rcp.emplace_back(
-                _fd,
+                fd,
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Write,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Write>(_fd, std::move(buffer)));
+                std::make_unique<Handler_Write>(std::move(buffer)));
             return rcp;
         };
     };
@@ -250,21 +235,18 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform<F, Handler_Redirect> : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
         std::vector<int> _fds{};
 
-        Handler_Read_Transform(int fd, F const* transformer, const std::vector<int>& fds)
-            : _fd(fd), _transformer(transformer), _fds(fds) {};
-        Handler_Read_Transform(int fd, F const* transformer, std::vector<int>&& fds)
-            : _fd(fd), _transformer(transformer), _fds(std::move(fds)) {};
+        Handler_Read_Transform(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Read_Transform(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer)) {
-                HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            if (!read_helper(fd, buffer)) {
+                HANDLER_RETURN_PACK__UNREGISTER(fd);
             }
 
             // transform the recieved data by function F
@@ -272,18 +254,18 @@ namespace BA_Socket {
             if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
-                ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
+                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 HANDLER_RETURN_PACK__NONE();
             }
 
             // return the handler pack
             reactor_command_pack_t rcp{};
             rcp.emplace_back(
-                _fd,
+                fd,
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Write,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Redirect>(_fd, std::move(buffer), _fds));
+                std::make_unique<Handler_Redirect>(std::move(buffer), _fds));
             return rcp;
         };
     };
@@ -300,18 +282,15 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform_Write : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
 
-        Handler_Read_Transform_Write(int fd, F const* transformer)
-            : _fd(fd), _transformer(transformer) {};
+        explicit Handler_Read_Transform_Write(F const* transformer)
+            : _transformer(transformer) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer)) {
-                HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            if (!read_helper(fd, buffer)) {
+                HANDLER_RETURN_PACK__UNREGISTER(fd);
             }
 
             // transform the recieved data by function F
@@ -319,13 +298,13 @@ namespace BA_Socket {
             if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
-                ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
+                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 HANDLER_RETURN_PACK__NONE();
             }
 
             // send the transformed data back to the peer
             PRINTF1("[Handler]: Sending the transformed data back to the peer...\n");
-            ::send(_fd, buffer.c_str(), buffer.size(), 0);
+            ::send(fd, buffer.c_str(), buffer.size(), 0);
             PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
 
             // return the handler pack
@@ -345,21 +324,18 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Read_Transform_Redirect : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
         std::vector<int> _fds{};
 
-        Handler_Read_Transform_Redirect(int fd, F const* transformer, const std::vector<int>& fds)
-            : _fd(fd), _transformer(transformer), _fds(fds) {};
-        Handler_Read_Transform_Redirect(int fd, F const* transformer, std::vector<int>&& fds)
-            : _fd(fd), _transformer(transformer), _fds(std::move(fds)) {};
+        Handler_Read_Transform_Redirect(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Read_Transform_Redirect(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             std::string buffer;
-            if (!read_helper(_fd, buffer)) {
-                HANDLER_RETURN_PACK__UNREGISTER(_fd);
+            if (!read_helper(fd, buffer)) {
+                HANDLER_RETURN_PACK__UNREGISTER(fd);
             }
 
             // transform the recieved data by function F
@@ -367,7 +343,7 @@ namespace BA_Socket {
             if (!(*_transformer)(buffer)) {
                 // send the info for the failed transformation (wrong input data) to the peer
                 PRINTF1("[Handler]: Sending the info for the failed transformation (wrong input data) to the peer...\n");
-                ::send(_fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
+                ::send(fd, INFO_WRONG_DATA.c_str(), INFO_WRONG_DATA.size(), 0);
                 HANDLER_RETURN_PACK__NONE();
             }
 
@@ -396,24 +372,21 @@ namespace BA_Socket {
     template <typename Next_Handler_Type>
         requires std::is_base_of_v<IHandler, Next_Handler_Type>
     struct Handler_Accept : public IHandler {
-        int _fd{-1};
         std::string _buffer{};
 
-        Handler_Accept(int fd, const std::string& buffer)
-            : _fd(fd), _buffer(buffer) {};
-        Handler_Accept(int fd, std::string&& buffer)
-            : _fd(fd), _buffer(std::move(buffer)) {};
+        explicit Handler_Accept(const std::string& buffer)
+            : _buffer(buffer) {};
+        explicit Handler_Accept(std::string&& buffer)
+            : _buffer(std::move(buffer)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
             SOCKET fd_client = ::accept(
-                _fd,
+                fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
@@ -429,7 +402,7 @@ namespace BA_Socket {
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Write,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Write>(fd_client, _buffer));
+                std::make_unique<Handler_Write>(_buffer));
             return rcp;
         };
     };
@@ -446,22 +419,19 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Forward<F>
     struct Handler_Accept<Handler_Read_Forward<F>> : public IHandler {
-        int _fd{-1};
         F const* _forwarder{};
 
-        Handler_Accept(int fd, F const* forwarder)
-            : _fd(fd), _forwarder(forwarder) {};
+        explicit Handler_Accept(F const* forwarder)
+            : _forwarder(forwarder) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
             SOCKET fd_client = ::accept(
-                _fd,
+                fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
@@ -477,7 +447,7 @@ namespace BA_Socket {
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Read_Forward<F>>(fd_client, _forwarder));
+                std::make_unique<Handler_Read_Forward<F>>(_forwarder));
             return rcp;
         };
     };
@@ -493,24 +463,21 @@ namespace BA_Socket {
     //   Adds a new Handler_Read_Redirect.
     template <>
     struct Handler_Accept<Handler_Read_Redirect> : public IHandler {
-        int _fd{-1};
         std::vector<int> _fds{};
 
-        Handler_Accept(int fd, const std::vector<int>& fds)
-            : _fd(fd), _fds(fds) {};
-        Handler_Accept(int fd, std::vector<int>&& fds)
-            : _fd(fd), _fds(std::move(fds)) {};
+        explicit Handler_Accept(const std::vector<int>& fds)
+            : _fds(fds) {};
+        explicit Handler_Accept(std::vector<int>&& fds)
+            : _fds(std::move(fds)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
             SOCKET fd_client = ::accept(
-                _fd,
+                fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
@@ -526,7 +493,7 @@ namespace BA_Socket {
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Read_Redirect>(fd_client, _fds));
+                std::make_unique<Handler_Read_Redirect>(_fds));
             return rcp;
         };
     };
@@ -543,22 +510,19 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Accept<Handler_Read_Transform<F, Handler_Write>> : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
 
-        Handler_Accept(int fd, F const* transformer)
-            : _fd(fd), _transformer(transformer) {};
+        explicit Handler_Accept(F const* transformer)
+            : _transformer(transformer) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
             SOCKET fd_client = ::accept(
-                _fd,
+                fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
@@ -574,7 +538,7 @@ namespace BA_Socket {
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Read_Transform<F, Handler_Write>>(fd_client, _transformer));
+                std::make_unique<Handler_Read_Transform<F, Handler_Write>>(_transformer));
             return rcp;
         };
     };
@@ -591,25 +555,22 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Accept<Handler_Read_Transform<F, Handler_Redirect>> : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
         std::vector<int> _fds{};
 
-        Handler_Accept(int fd, F const* transformer, const std::vector<int>& fds)
-            : _fd(fd), _transformer(transformer), _fds(fds) {};
-        Handler_Accept(int fd, F const* transformer, std::vector<int>&& fds)
-            : _fd(fd), _transformer(transformer), _fds(std::move(fds)) {};
+        Handler_Accept(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Accept(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
             SOCKET fd_client = ::accept(
-                _fd,
+                fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
@@ -625,7 +586,7 @@ namespace BA_Socket {
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Read_Transform<F, Handler_Redirect>>(fd_client, _transformer, _fds));
+                std::make_unique<Handler_Read_Transform<F, Handler_Redirect>>(_transformer, _fds));
             return rcp;
         };
     };
@@ -642,22 +603,19 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Accept<Handler_Read_Transform_Write<F>> : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
 
-        Handler_Accept(int fd, F const* transformer)
-            : _fd(fd), _transformer(transformer) {};
+        explicit Handler_Accept(F const* transformer)
+            : _transformer(transformer) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
             SOCKET fd_client = ::accept(
-                _fd,
+                fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
@@ -673,7 +631,7 @@ namespace BA_Socket {
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Read_Transform_Write<F>>(fd_client, _transformer));
+                std::make_unique<Handler_Read_Transform_Write<F>>(_transformer));
             return rcp;
         };
     };
@@ -690,25 +648,22 @@ namespace BA_Socket {
     template <typename F>
         requires CString_Transform<F>
     struct Handler_Accept<Handler_Read_Transform_Redirect<F>> : public IHandler {
-        int _fd{-1};
         F const* _transformer{};
         std::vector<int> _fds{};
 
-        Handler_Accept(int fd, F const* transformer, const std::vector<int>& fds)
-            : _fd(fd), _transformer(transformer), _fds(fds) {};
-        Handler_Accept(int fd, F const* transformer, std::vector<int>&& fds)
-            : _fd(fd), _transformer(transformer), _fds(std::move(fds)) {};
+        Handler_Accept(F const* transformer, const std::vector<int>& fds)
+            : _transformer(transformer), _fds(fds) {};
+        Handler_Accept(F const* transformer, std::vector<int>&& fds)
+            : _transformer(transformer), _fds(std::move(fds)) {};
 
-        inline int get_fd() const override { return _fd; };
-
-        reactor_command_pack_t apply() const override {
+        reactor_command_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
             struct sockaddr_storage client_addr;
             socklen_t client_len = sizeof(client_addr);
             SOCKET fd_client = ::accept(
-                _fd,
+                fd,
                 (struct sockaddr*) &client_addr,
                 &client_len);
             if (!IS_VALID_SOCKET(fd_client)) {
@@ -724,7 +679,7 @@ namespace BA_Socket {
                 Enum_Register_Types::Register,
                 Enum_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Read_Transform_Redirect<F>>(fd_client, _transformer, _fds));
+                std::make_unique<Handler_Read_Transform_Redirect<F>>(_transformer, _fds));
             return rcp;
         };
     };

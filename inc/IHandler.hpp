@@ -24,14 +24,15 @@ namespace BA_Socket {
     // Handler interface
     struct IHandler {
         virtual ~IHandler() = default;
-        virtual int get_fd() const = 0;
-        virtual inline reactor_command_pack_t apply() const {
+        virtual inline reactor_command_pack_t apply(int fd) const {
             HANDLER_RETURN_PACK__NONE();
         };
     };
 
     struct Job {
+        int _fd{-1};
         IHandler* _handler{};
+        Job(int fd, IHandler *handler) : _fd(fd), _handler(handler) {};
     };
     using job_result_t = Reactor_Command;
     using job_result_pack_t = std::vector<job_result_t>;

@@ -66,6 +66,11 @@
         "future": "cpp",
         "iomanip": "cpp",
         "typeindex": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "strstream": "cpp",
+        "unordered_set": "cpp",
+        "fstream": "cpp",
+        "cfenv": "cpp",
+        "valarray": "cpp"
     }
 }

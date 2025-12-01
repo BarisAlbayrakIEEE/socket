@@ -18,7 +18,7 @@ namespace BA_Socket {
         const Job& job,
         Concurrent_Queue_Type<job_result_t>& job_results)
     {
-        auto reactor_command_pack = std::move(job._handler->apply());
+        auto reactor_command_pack = std::move(job._handler->apply(job._fd));
         for (auto& reactor_command : reactor_command_pack) {
             job_results.push(std::move(reactor_command));
         }
@@ -94,15 +94,15 @@ namespace BA_Socket {
             FD_SET(1, &_fd_set__write);
         }
 
-        inline void add_handler(handler_ptr_t&& handler, Enum_Event_Types event_type) {
+        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
             if (!handler) return;
             if (event_type == Enum_Event_Types::None) return;
 
             if (event_type == Enum_Event_Types::Read) {
-                _handler_entrys[handler->get_fd()]._handler__read = std::move(handler);
+                _handler_entrys[fd]._handler__read = std::move(handler);
             }
             else if (event_type == Enum_Event_Types::Write) {
-                _handler_entrys[handler->get_fd()]._handler__write = std::move(handler);
+                _handler_entrys[fd]._handler__write = std::move(handler);
             }
         }
 
@@ -145,7 +145,7 @@ namespace BA_Socket {
                     if (!handler_ptr) continue;
 
                     // push the job into the job queue
-                    _jobs.push(Job(handler_ptr));
+                    _jobs.push(Job(fd, handler_ptr));
                 }
 
                 // execute _handler_entrys - write
@@ -160,7 +160,7 @@ namespace BA_Socket {
                     if (!handler_ptr) continue;
 
                     // push the job into the job queue
-                    _jobs.push(Job(handler_ptr));
+                    _jobs.push(Job(fd, handler_ptr));
                 }
 
                 // submit the jobs via the thread pool - multiple threads
@@ -212,7 +212,7 @@ namespace BA_Socket {
                     handler_command_type == Enum_Handler_Command_Types::Add ||
                     handler_command_type == Enum_Handler_Command_Types::Replace)
                 {
-                    add_handler(std::move(handler__new), event_type);
+                    add_handler(fd, std::move(handler__new), event_type);
                 }
             }
         }
