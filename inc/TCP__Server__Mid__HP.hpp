@@ -12,12 +12,15 @@
 using namespace BA_Concurrency;
 
 namespace BA_Socket {
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    template <
+        template <typename> typename Concurrent_Queue_Type,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type<Job>,
+                Concurrent_Queue_Type<job_result_t>,
+                Thread_Pool_Type>
     int TCP__Server__Mid__HP_helper() {
-        using EL_t = Event_Loop__Mid__HP<
-            Concurrent_Queue_Type,
-            Thread_Pool_Type>;
+        using EL_t = Event_Loop__Mid__HP<Concurrent_Queue_Type, Thread_Pool_Type>;
 
         // create the server socket and bind to the local address
         PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
@@ -48,8 +51,13 @@ namespace BA_Socket {
         return 0;
     }
     
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    template <
+        template <typename> typename Concurrent_Queue_Type,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type<Job>,
+                Concurrent_Queue_Type<job_result_t>,
+                Thread_Pool_Type>
     inline int TCP__Server__Mid__HP() {
         SOCKET_STARTUP();
         int status = TCP__Server__Mid__HP_helper<Concurrent_Queue_Type, Thread_Pool_Type>();

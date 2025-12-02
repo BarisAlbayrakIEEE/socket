@@ -3,8 +3,13 @@
 #ifndef IEVENT_HANDLER_HPP
 #define IEVENT_HANDLER_HPP
 
+#include <type_traits>
+#include <concepts>
+#include "IConcurrent_Queue.hpp"
+#include "IThread_Pool.hpp"
 #include "Reactor_Event.hpp"
-#include "aux_type_traits.hpp"
+
+using namespace BA_Concurrency;
 
 #define READ_LEN 4096
 #define HANDLER_RETURN_PACK__NONE()                            \
@@ -16,8 +21,8 @@
     rep.emplace_back(                                          \
         (fd__),                                                \
         Enum_Register_Types::Unregister,                       \
-        Enum_IO_Event_Types::Read_Write,                        \
-        Enum_Handler_Command_Types::Remove,                    \
+        Enum_IO_Event_Types::Read_Write,                       \
+        Enum_Event_Handler_Action_Types::Remove,                    \
         nullptr);                                              \
     return rep
 
@@ -53,10 +58,30 @@ namespace BA_Socket {
     using job_result_t = Reactor_Event;
     using job_result_pack_t = std::vector<job_result_t>;
 
-    template <template <typename> typename Concurrent_Queue_Type>
+    template <
+        typename Concurrent_Queue_Type__Job,
+        typename Concurrent_Queue_Type__job_result,
+        typename Thread_Pool_Type>
+    concept CEL = (
+        std::is_base_of_v<IConcurrent_Queue<Job>, Concurrent_Queue_Type__Job> &&
+        std::is_base_of_v<IConcurrent_Queue<job_result_t>, Concurrent_Queue_Type__job_result> &&
+        std::is_base_of_v<IThread_Pool, Thread_Pool_Type>);
+
+    template <typename F>
+    concept CString_Forward = 
+        requires (F f, const std::string& s) { { f(s) } -> std::same_as<bool>; };
+
+    template <typename F>
+    concept CString_Transform = 
+        requires (F f, std::string& s) { { f(s) } -> std::same_as<bool>; };
+    
+    using string_forward_t = bool(const std::string&);
+    using string_transform_t = bool(std::string&);
+
+    template <typename Concurrent_Queue_Type__job_result>
     void execute_job(
         const Job& job,
-        Concurrent_Queue_Type<job_result_t>& job_results)
+        Concurrent_Queue_Type__job_result& job_results)
     {
         auto rep = std::move(job._event_handler->apply(job._fd));
         for (auto& rc : rep) {

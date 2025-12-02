@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/TCP_client__select__MT.dir/TCP_client__select__MT.cpp.o -o ../bin/TCP_client__select__MT 

@@ -11,16 +11,19 @@
 using namespace BA_Concurrency;
 
 namespace BA_Socket {
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    template <
+        template <typename> typename Concurrent_Queue_Type,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type<Job>,
+                Concurrent_Queue_Type<job_result_t>,
+                Thread_Pool_Type>
     int TCP__Client__Low__HP_helper(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
     {
-        using EL_t = Event_Loop__Low__HP<
-            Concurrent_Queue_Type,
-            Thread_Pool_Type>;
+        using EL_t = Event_Loop__Low__HP<Concurrent_Queue_Type, Thread_Pool_Type>;
 
         // obtain the peer address
         struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
@@ -71,9 +74,14 @@ namespace BA_Socket {
 
         return 0;
     }
-    
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+
+    template <
+        template <typename> typename Concurrent_Queue_Type,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type<Job>,
+                Concurrent_Queue_Type<job_result_t>,
+                Thread_Pool_Type>
     inline int TCP__Client__Low__HP(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,

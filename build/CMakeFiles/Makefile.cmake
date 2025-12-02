@@ -104,8 +104,12 @@ set(CMAKE_MAKEFILE_PRODUCTS
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
-  "src/CMakeFiles/TCP_server__select__ST.dir/DependInfo.cmake"
-  "src/CMakeFiles/TCP_server__select__MT.dir/DependInfo.cmake"
-  "src/CMakeFiles/TCP_client__select__ST.dir/DependInfo.cmake"
-  "src/CMakeFiles/TCP_client__select__MT.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Server__Low__ST.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Server__Low__HP.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Server__Mid__ST.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Server__Mid__HP.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Client__Low__ST.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Client__Low__HP.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Client__Mid__ST.dir/DependInfo.cmake"
+  "src/CMakeFiles/TCP__Client__Mid__HP.dir/DependInfo.cmake"
   )

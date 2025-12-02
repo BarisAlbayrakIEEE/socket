@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/TCP_client__select__ST.dir/TCP_client__select__ST.cpp.o -o ../bin/TCP_client__select__ST 

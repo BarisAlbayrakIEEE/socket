@@ -15,7 +15,7 @@ namespace BA_Socket {
         int _fd{-1};
         Enum_Register_Types _register_type{ Enum_Register_Types::None };
         Enum_IO_Event_Types _event_type{ Enum_IO_Event_Types::None };
-        Enum_Handler_Command_Types _handler_command_type{ Enum_Handler_Command_Types::None };
+        Enum_Event_Handler_Action_Types _handler_command_type{ Enum_Event_Handler_Action_Types::None };
         event_handler_ptr_t _handler_ptr{ nullptr };
 
         Reactor_Event() = default;
@@ -23,7 +23,7 @@ namespace BA_Socket {
             int fd,
             Enum_Register_Types register_type,
             Enum_IO_Event_Types event_type,
-            Enum_Handler_Command_Types handler_command_type,
+            Enum_Event_Handler_Action_Types handler_command_type,
             event_handler_ptr_t&& handler_ptr)
             :
             _fd(fd),

@@ -17,14 +17,20 @@
 #include "Event_Handler.hpp"
 
 namespace BA_Socket {
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    template <
+        typename Concurrent_Queue_Type__Job,
+        typename Concurrent_Queue_Type__job_result,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type__Job,
+                Concurrent_Queue_Type__job_result,
+                Thread_Pool_Type>
     class Event_Loop<
         Enum_Event_Loop_Types::Low,
         Enum_Concurrency_Types::HP,
-        Thread_Pool_Type,
-        Job,
-        job_result_t>
+        Concurrent_Queue_Type__Job,
+        Concurrent_Queue_Type__job_result,
+        Thread_Pool_Type>
             : public IEvent_Loop
     {
     public:
@@ -195,7 +201,7 @@ namespace BA_Socket {
                 auto job_val = std::move(job.value());
                 _tp.submit(
                     [job_val, this]()
-                    { execute_job<Concurrent_Queue_Type>(job_val, _job_results); });
+                    { execute_job<Concurrent_Queue_Type__job_result>(job_val, _job_results); });
             }
         }
 
@@ -212,7 +218,7 @@ namespace BA_Socket {
                 auto job_result{ _job_results.pop() };
                 if (!job_result.has_value()) continue;
 
-                auto& [fd, register_type, event_type, handler_command_type, handler__new] = job_result.value();
+                auto& [fd, register_type, event_type, event_handler_action_type, handler__new] = job_result.value();
                 if (register_type == Enum_Register_Types::Unregister) {
                     fd_unregister(fd);
                 }
@@ -220,8 +226,8 @@ namespace BA_Socket {
                     fd_register(fd, event_type);
                 }
                 if (
-                    handler_command_type == Enum_Handler_Command_Types::Add ||
-                    handler_command_type == Enum_Handler_Command_Types::Replace)
+                    event_handler_action_type == Enum_Event_Handler_Action_Types::Add ||
+                    event_handler_action_type == Enum_Event_Handler_Action_Types::Replace)
                 {
                     add_event_handler(fd, std::move(handler__new), event_type);
                 }
@@ -229,8 +235,8 @@ namespace BA_Socket {
         }
 
         std::unordered_map<int, Event_Handler_Entry> _event_handler_entrys;
-        Concurrent_Queue_Type<Job> _jobs;
-        Concurrent_Queue_Type<job_result_t> _job_results;
+        Concurrent_Queue_Type__Job _jobs;
+        Concurrent_Queue_Type__job_result _job_results;
         Thread_Pool_Type _tp;
         fd_set _fd_set__read;
         fd_set _fd_set__write;
@@ -240,14 +246,19 @@ namespace BA_Socket {
         std::atomic<bool> _running{false};
     };
 
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    template <
+        template <typename> typename Concurrent_Queue_Type,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type<Job>,
+                Concurrent_Queue_Type<job_result_t>,
+                Thread_Pool_Type>
     using Event_Loop__Low__HP = Event_Loop<
         Enum_Event_Loop_Types::Low,
         Enum_Concurrency_Types::HP,
-        Thread_Pool_Type,
-        Job,
-        job_result_t>;
+        Concurrent_Queue_Type<Job>,
+        Concurrent_Queue_Type<job_result_t>,
+        Thread_Pool_Type>;
 } // namespace BA_Socket
 
 #endif // EVENT_LOOP__LOW__HP_HPP

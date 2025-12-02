@@ -18,14 +18,20 @@
 #include "Event_Handler.hpp"
 
 namespace BA_Socket {
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    template <
+        typename Concurrent_Queue_Type__Job,
+        typename Concurrent_Queue_Type__job_result,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type__Job,
+                Concurrent_Queue_Type__job_result,
+                Thread_Pool_Type>
     class Event_Loop<
         Enum_Event_Loop_Types::Mid,
         Enum_Concurrency_Types::HP,
-        Thread_Pool_Type,
-        Job,
-        job_result_t>
+        Concurrent_Queue_Type__Job,
+        Concurrent_Queue_Type__job_result,
+        Thread_Pool_Type>
             : public IEvent_Loop
     {
     public:
@@ -54,7 +60,7 @@ namespace BA_Socket {
             if (it != _pollfds.end()) {
                 it->events |= events;
             } else {
-                pollfd_t pollfd_{};
+                pollfd_x pollfd_{};
                 pollfd_.fd = fd;
                 pollfd_.events = events;
                 pollfd_.revents = 0;
@@ -67,7 +73,7 @@ namespace BA_Socket {
                 std::remove_if(
                     _pollfds.begin(),
                     _pollfds.end(),
-                    [fd](const pollfd_t& pollfd_){ return pollfd_.fd == fd; }),
+                    [fd](const pollfd_x& pollfd_){ return pollfd_.fd == fd; }),
                 _pollfds.end());
             _event_handler_entrys.erase(fd);
         }
@@ -92,7 +98,7 @@ namespace BA_Socket {
                 if (_pollfds.empty()) break;
 
                 // perform poll operation
-                std::vector<pollfd_t> pollfds_copy = _pollfds;
+                std::vector<pollfd_x> pollfds_copy = _pollfds;
                 int status = poll_x(
                     pollfds_copy.data(),
                     static_cast<nfds_x>(pollfds_copy.size()),
@@ -122,7 +128,7 @@ namespace BA_Socket {
     private:
 
         // get the event handler entry from the pollfd
-        inline Event_Handler_Entry* get_event_handler_entry_ptr(const pollfd_t & pollfd_) {
+        inline Event_Handler_Entry* get_event_handler_entry_ptr(const pollfd_x & pollfd_) {
             if (pollfd_.revents == 0) return nullptr;
             if (!IS_VALID_SOCKET(pollfd_.fd)) return nullptr;
 #if defined(_WIN32)
@@ -138,7 +144,7 @@ namespace BA_Socket {
 
         // create jobs from the current handler entry map
         void create_jobs(
-            const std::vector<pollfd_t>& pollfds_copy)
+            const std::vector<pollfd_x>& pollfds_copy)
         {
             for (const auto& pollfd_ : pollfds_copy) {
                 // get the event handler entry from the pollfd
@@ -147,10 +153,10 @@ namespace BA_Socket {
 
                 // add the new jobs into _jobs
                 if ((pollfd_.revents & POLL_X_IN) && event_handler_entry_ptr->_event_handler__read) {
-                    _jobs.push(Job(pollfd_.fd, event_handler_entry_ptr->_event_handler__read));
+                    _jobs.push(Job(pollfd_.fd, event_handler_entry_ptr->_event_handler__read.get()));
                 }
                 if ((pollfd_.revents & POLL_X_OUT) && event_handler_entry_ptr->_event_handler__write) {
-                    _jobs.push(Job(pollfd_.fd, event_handler_entry_ptr->_event_handler__write));
+                    _jobs.push(Job(pollfd_.fd, event_handler_entry_ptr->_event_handler__write.get()));
                 }
             }
         }
@@ -166,7 +172,7 @@ namespace BA_Socket {
                 auto job_val = std::move(job.value());
                 _tp.submit(
                     [job_val, this]()
-                    { execute_job<Concurrent_Queue_Type>(job_val, _job_results); });
+                    { execute_job<Concurrent_Queue_Type__job_result>(job_val, _job_results); });
             }
         }
 
@@ -183,7 +189,7 @@ namespace BA_Socket {
                 auto job_result{ _job_results.pop() };
                 if (!job_result.has_value()) continue;
 
-                auto& [fd, register_type, event_type, handler_command_type, handler__new] = job_result.value();
+                auto& [fd, register_type, event_type, event_handler_action_type, handler__new] = job_result.value();
                 if (register_type == Enum_Register_Types::Unregister) {
                     fd_unregister(fd);
                 }
@@ -191,8 +197,8 @@ namespace BA_Socket {
                     fd_register(fd, event_type);
                 }
                 if (
-                    handler_command_type == Enum_Handler_Command_Types::Add ||
-                    handler_command_type == Enum_Handler_Command_Types::Replace)
+                    event_handler_action_type == Enum_Event_Handler_Action_Types::Add ||
+                    event_handler_action_type == Enum_Event_Handler_Action_Types::Replace)
                 {
                     add_event_handler(fd, std::move(handler__new), event_type);
                 }
@@ -200,22 +206,27 @@ namespace BA_Socket {
         }
 
         std::unordered_map<int, Event_Handler_Entry> _event_handler_entrys;
-        std::vector<pollfd_t> _pollfds;
-        Concurrent_Queue_Type<Job> _jobs;
-        Concurrent_Queue_Type<job_result_t> _job_results;
+        std::vector<pollfd_x> _pollfds;
+        Concurrent_Queue_Type__Job _jobs;
+        Concurrent_Queue_Type__job_result _job_results;
         Thread_Pool_Type _tp;
         timeout_x _msec{ -1 };
         std::atomic<bool> _running{ false };
     };
 
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    template <
+        template <typename> typename Concurrent_Queue_Type,
+        typename Thread_Pool_Type>
+            requires CEL<
+                Concurrent_Queue_Type<Job>,
+                Concurrent_Queue_Type<job_result_t>,
+                Thread_Pool_Type>
     using Event_Loop__Mid__HP = Event_Loop<
         Enum_Event_Loop_Types::Mid,
         Enum_Concurrency_Types::HP,
-        Thread_Pool_Type,
-        Job,
-        job_result_t>;
+        Concurrent_Queue_Type<Job>,
+        Concurrent_Queue_Type<job_result_t>,
+        Thread_Pool_Type>;
 } // namespace BA_Socket
 
 #endif // EVENT_LOOP__MID__HP_HPP

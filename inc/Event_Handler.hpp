@@ -65,7 +65,7 @@ namespace BA_Socket {
                     fd,
                     Enum_Register_Types::Register,
                     Enum_IO_Event_Types::Write,
-                    Enum_Handler_Command_Types::Add,
+                    Enum_Event_Handler_Action_Types::Add,
                     std::make_unique<Handler_Write>(std::move(remaining)));
                 return;
             }
@@ -78,7 +78,7 @@ namespace BA_Socket {
                     fd,
                     Enum_Register_Types::Unregister,
                     Enum_IO_Event_Types::Read_Write,
-                    Enum_Handler_Command_Types::Remove,
+                    Enum_Event_Handler_Action_Types::Remove,
                     nullptr);
                 return;
             }
@@ -92,7 +92,7 @@ namespace BA_Socket {
                     fd,
                     Enum_Register_Types::Register,
                     Enum_IO_Event_Types::Write,
-                    Enum_Handler_Command_Types::Add,
+                    Enum_Event_Handler_Action_Types::Add,
                     std::make_unique<Handler_Write>(buffer));
                 return;
             }
@@ -104,7 +104,7 @@ namespace BA_Socket {
                     fd,
                     Enum_Register_Types::Register,
                     Enum_IO_Event_Types::Write,
-                    Enum_Handler_Command_Types::Add,
+                    Enum_Event_Handler_Action_Types::Add,
                     std::make_unique<Handler_Write>(buffer));
                 return;
             }
@@ -117,7 +117,7 @@ namespace BA_Socket {
                 fd,
                 Enum_Register_Types::Unregister,
                 Enum_IO_Event_Types::Read_Write,
-                Enum_Handler_Command_Types::Remove,
+                Enum_Event_Handler_Action_Types::Remove,
                 nullptr);
         }
     }
@@ -303,7 +303,7 @@ namespace BA_Socket {
                 fd,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Write,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Write>(std::move(buffer)));
             return rep;
         };
@@ -352,7 +352,7 @@ namespace BA_Socket {
                 fd,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Write,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Redirect>(std::move(buffer), _fds));
             return rep;
         };
@@ -495,7 +495,7 @@ namespace BA_Socket {
                 fd_client,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Write,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Write>(_buffer));
             return rep;
         };
@@ -540,7 +540,7 @@ namespace BA_Socket {
                 fd_client,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Read,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Read_Forward<F>>(_forwarder));
             return rep;
         };
@@ -586,7 +586,7 @@ namespace BA_Socket {
                 fd_client,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Read,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Read_Redirect>(_fds));
             return rep;
         };
@@ -631,7 +631,7 @@ namespace BA_Socket {
                 fd_client,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Read,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Read_Transform<F, Handler_Write>>(_transformer));
             return rep;
         };
@@ -679,7 +679,7 @@ namespace BA_Socket {
                 fd_client,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Read,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Read_Transform<F, Handler_Redirect>>(_transformer, _fds));
             return rep;
         };
@@ -724,7 +724,7 @@ namespace BA_Socket {
                 fd_client,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Read,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Read_Transform_Write<F>>(_transformer));
             return rep;
         };
@@ -772,7 +772,7 @@ namespace BA_Socket {
                 fd_client,
                 Enum_Register_Types::Register,
                 Enum_IO_Event_Types::Read,
-                Enum_Handler_Command_Types::Add,
+                Enum_Event_Handler_Action_Types::Add,
                 std::make_unique<Handler_Read_Transform_Redirect<F>>(_transformer, _fds));
             return rep;
         };

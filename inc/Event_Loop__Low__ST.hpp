@@ -188,7 +188,7 @@ namespace BA_Socket {
 
         // apply the reactor events
         void apply_reactor_events(reactor_event_pack_t& rep_next) {
-            for (auto& [fd, register_type, event_type, handler_command_type, handler__new] : rep_next) {
+            for (auto& [fd, register_type, event_type, event_handler_action_type, event_handler__new] : rep_next) {
                 if (register_type == Enum_Register_Types::Unregister) {
                     fd_unregister(fd);
                 }
@@ -196,10 +196,10 @@ namespace BA_Socket {
                     fd_register(fd, event_type);
                 }
                 if (
-                    handler_command_type == Enum_Handler_Command_Types::Add ||
-                    handler_command_type == Enum_Handler_Command_Types::Replace)
+                    event_handler_action_type == Enum_Event_Handler_Action_Types::Add ||
+                    event_handler_action_type == Enum_Event_Handler_Action_Types::Replace)
                 {
-                    add_event_handler(fd, std::move(handler__new), event_type);
+                    add_event_handler(fd, std::move(event_handler__new), event_type);
                 }
             }
         }

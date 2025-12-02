@@ -117,156 +117,308 @@ depend:
 .PHONY : depend
 
 # Convenience name for target.
-src/CMakeFiles/TCP_server__select__ST.dir/rule:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_server__select__ST.dir/rule
-.PHONY : src/CMakeFiles/TCP_server__select__ST.dir/rule
+src/CMakeFiles/TCP__Server__Low__ST.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Server__Low__ST.dir/rule
+.PHONY : src/CMakeFiles/TCP__Server__Low__ST.dir/rule
 
 # Convenience name for target.
-TCP_server__select__ST: src/CMakeFiles/TCP_server__select__ST.dir/rule
-.PHONY : TCP_server__select__ST
+TCP__Server__Low__ST: src/CMakeFiles/TCP__Server__Low__ST.dir/rule
+.PHONY : TCP__Server__Low__ST
 
 # fast build rule for target.
-TCP_server__select__ST/fast:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/build
-.PHONY : TCP_server__select__ST/fast
+TCP__Server__Low__ST/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__ST.dir/build.make src/CMakeFiles/TCP__Server__Low__ST.dir/build
+.PHONY : TCP__Server__Low__ST/fast
 
 # Convenience name for target.
-src/CMakeFiles/TCP_server__select__MT.dir/rule:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_server__select__MT.dir/rule
-.PHONY : src/CMakeFiles/TCP_server__select__MT.dir/rule
+src/CMakeFiles/TCP__Server__Low__HP.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Server__Low__HP.dir/rule
+.PHONY : src/CMakeFiles/TCP__Server__Low__HP.dir/rule
 
 # Convenience name for target.
-TCP_server__select__MT: src/CMakeFiles/TCP_server__select__MT.dir/rule
-.PHONY : TCP_server__select__MT
+TCP__Server__Low__HP: src/CMakeFiles/TCP__Server__Low__HP.dir/rule
+.PHONY : TCP__Server__Low__HP
 
 # fast build rule for target.
-TCP_server__select__MT/fast:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/build
-.PHONY : TCP_server__select__MT/fast
+TCP__Server__Low__HP/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__HP.dir/build.make src/CMakeFiles/TCP__Server__Low__HP.dir/build
+.PHONY : TCP__Server__Low__HP/fast
 
 # Convenience name for target.
-src/CMakeFiles/TCP_client__select__ST.dir/rule:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_client__select__ST.dir/rule
-.PHONY : src/CMakeFiles/TCP_client__select__ST.dir/rule
+src/CMakeFiles/TCP__Server__Mid__ST.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Server__Mid__ST.dir/rule
+.PHONY : src/CMakeFiles/TCP__Server__Mid__ST.dir/rule
 
 # Convenience name for target.
-TCP_client__select__ST: src/CMakeFiles/TCP_client__select__ST.dir/rule
-.PHONY : TCP_client__select__ST
+TCP__Server__Mid__ST: src/CMakeFiles/TCP__Server__Mid__ST.dir/rule
+.PHONY : TCP__Server__Mid__ST
 
 # fast build rule for target.
-TCP_client__select__ST/fast:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/build
-.PHONY : TCP_client__select__ST/fast
+TCP__Server__Mid__ST/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__ST.dir/build.make src/CMakeFiles/TCP__Server__Mid__ST.dir/build
+.PHONY : TCP__Server__Mid__ST/fast
 
 # Convenience name for target.
-src/CMakeFiles/TCP_client__select__MT.dir/rule:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP_client__select__MT.dir/rule
-.PHONY : src/CMakeFiles/TCP_client__select__MT.dir/rule
+src/CMakeFiles/TCP__Server__Mid__HP.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Server__Mid__HP.dir/rule
+.PHONY : src/CMakeFiles/TCP__Server__Mid__HP.dir/rule
 
 # Convenience name for target.
-TCP_client__select__MT: src/CMakeFiles/TCP_client__select__MT.dir/rule
-.PHONY : TCP_client__select__MT
+TCP__Server__Mid__HP: src/CMakeFiles/TCP__Server__Mid__HP.dir/rule
+.PHONY : TCP__Server__Mid__HP
 
 # fast build rule for target.
-TCP_client__select__MT/fast:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/build
-.PHONY : TCP_client__select__MT/fast
+TCP__Server__Mid__HP/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__HP.dir/build.make src/CMakeFiles/TCP__Server__Mid__HP.dir/build
+.PHONY : TCP__Server__Mid__HP/fast
 
-TCP_client__select__MT.o: TCP_client__select__MT.cpp.o
-.PHONY : TCP_client__select__MT.o
+# Convenience name for target.
+src/CMakeFiles/TCP__Client__Low__ST.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Client__Low__ST.dir/rule
+.PHONY : src/CMakeFiles/TCP__Client__Low__ST.dir/rule
 
-# target to build an object file
-TCP_client__select__MT.cpp.o:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/TCP_client__select__MT.cpp.o
-.PHONY : TCP_client__select__MT.cpp.o
+# Convenience name for target.
+TCP__Client__Low__ST: src/CMakeFiles/TCP__Client__Low__ST.dir/rule
+.PHONY : TCP__Client__Low__ST
 
-TCP_client__select__MT.i: TCP_client__select__MT.cpp.i
-.PHONY : TCP_client__select__MT.i
+# fast build rule for target.
+TCP__Client__Low__ST/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__ST.dir/build.make src/CMakeFiles/TCP__Client__Low__ST.dir/build
+.PHONY : TCP__Client__Low__ST/fast
 
-# target to preprocess a source file
-TCP_client__select__MT.cpp.i:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/TCP_client__select__MT.cpp.i
-.PHONY : TCP_client__select__MT.cpp.i
+# Convenience name for target.
+src/CMakeFiles/TCP__Client__Low__HP.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Client__Low__HP.dir/rule
+.PHONY : src/CMakeFiles/TCP__Client__Low__HP.dir/rule
 
-TCP_client__select__MT.s: TCP_client__select__MT.cpp.s
-.PHONY : TCP_client__select__MT.s
+# Convenience name for target.
+TCP__Client__Low__HP: src/CMakeFiles/TCP__Client__Low__HP.dir/rule
+.PHONY : TCP__Client__Low__HP
 
-# target to generate assembly for a file
-TCP_client__select__MT.cpp.s:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/TCP_client__select__MT.cpp.s
-.PHONY : TCP_client__select__MT.cpp.s
+# fast build rule for target.
+TCP__Client__Low__HP/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__HP.dir/build.make src/CMakeFiles/TCP__Client__Low__HP.dir/build
+.PHONY : TCP__Client__Low__HP/fast
 
-TCP_client__select__ST.o: TCP_client__select__ST.cpp.o
-.PHONY : TCP_client__select__ST.o
+# Convenience name for target.
+src/CMakeFiles/TCP__Client__Mid__ST.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Client__Mid__ST.dir/rule
+.PHONY : src/CMakeFiles/TCP__Client__Mid__ST.dir/rule
 
-# target to build an object file
-TCP_client__select__ST.cpp.o:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/TCP_client__select__ST.cpp.o
-.PHONY : TCP_client__select__ST.cpp.o
+# Convenience name for target.
+TCP__Client__Mid__ST: src/CMakeFiles/TCP__Client__Mid__ST.dir/rule
+.PHONY : TCP__Client__Mid__ST
 
-TCP_client__select__ST.i: TCP_client__select__ST.cpp.i
-.PHONY : TCP_client__select__ST.i
+# fast build rule for target.
+TCP__Client__Mid__ST/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__ST.dir/build.make src/CMakeFiles/TCP__Client__Mid__ST.dir/build
+.PHONY : TCP__Client__Mid__ST/fast
 
-# target to preprocess a source file
-TCP_client__select__ST.cpp.i:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/TCP_client__select__ST.cpp.i
-.PHONY : TCP_client__select__ST.cpp.i
+# Convenience name for target.
+src/CMakeFiles/TCP__Client__Mid__HP.dir/rule:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/TCP__Client__Mid__HP.dir/rule
+.PHONY : src/CMakeFiles/TCP__Client__Mid__HP.dir/rule
 
-TCP_client__select__ST.s: TCP_client__select__ST.cpp.s
-.PHONY : TCP_client__select__ST.s
+# Convenience name for target.
+TCP__Client__Mid__HP: src/CMakeFiles/TCP__Client__Mid__HP.dir/rule
+.PHONY : TCP__Client__Mid__HP
 
-# target to generate assembly for a file
-TCP_client__select__ST.cpp.s:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/TCP_client__select__ST.cpp.s
-.PHONY : TCP_client__select__ST.cpp.s
+# fast build rule for target.
+TCP__Client__Mid__HP/fast:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__HP.dir/build.make src/CMakeFiles/TCP__Client__Mid__HP.dir/build
+.PHONY : TCP__Client__Mid__HP/fast
 
-TCP_server__select__MT.o: TCP_server__select__MT.cpp.o
-.PHONY : TCP_server__select__MT.o
-
-# target to build an object file
-TCP_server__select__MT.cpp.o:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/TCP_server__select__MT.cpp.o
-.PHONY : TCP_server__select__MT.cpp.o
-
-TCP_server__select__MT.i: TCP_server__select__MT.cpp.i
-.PHONY : TCP_server__select__MT.i
-
-# target to preprocess a source file
-TCP_server__select__MT.cpp.i:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/TCP_server__select__MT.cpp.i
-.PHONY : TCP_server__select__MT.cpp.i
-
-TCP_server__select__MT.s: TCP_server__select__MT.cpp.s
-.PHONY : TCP_server__select__MT.s
-
-# target to generate assembly for a file
-TCP_server__select__MT.cpp.s:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/TCP_server__select__MT.cpp.s
-.PHONY : TCP_server__select__MT.cpp.s
-
-TCP_server__select__ST.o: TCP_server__select__ST.cpp.o
-.PHONY : TCP_server__select__ST.o
+TCP__Client__Low__HP.o: TCP__Client__Low__HP.cpp.o
+.PHONY : TCP__Client__Low__HP.o
 
 # target to build an object file
-TCP_server__select__ST.cpp.o:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/TCP_server__select__ST.cpp.o
-.PHONY : TCP_server__select__ST.cpp.o
+TCP__Client__Low__HP.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__HP.dir/build.make src/CMakeFiles/TCP__Client__Low__HP.dir/TCP__Client__Low__HP.cpp.o
+.PHONY : TCP__Client__Low__HP.cpp.o
 
-TCP_server__select__ST.i: TCP_server__select__ST.cpp.i
-.PHONY : TCP_server__select__ST.i
+TCP__Client__Low__HP.i: TCP__Client__Low__HP.cpp.i
+.PHONY : TCP__Client__Low__HP.i
 
 # target to preprocess a source file
-TCP_server__select__ST.cpp.i:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/TCP_server__select__ST.cpp.i
-.PHONY : TCP_server__select__ST.cpp.i
+TCP__Client__Low__HP.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__HP.dir/build.make src/CMakeFiles/TCP__Client__Low__HP.dir/TCP__Client__Low__HP.cpp.i
+.PHONY : TCP__Client__Low__HP.cpp.i
 
-TCP_server__select__ST.s: TCP_server__select__ST.cpp.s
-.PHONY : TCP_server__select__ST.s
+TCP__Client__Low__HP.s: TCP__Client__Low__HP.cpp.s
+.PHONY : TCP__Client__Low__HP.s
 
 # target to generate assembly for a file
-TCP_server__select__ST.cpp.s:
-	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/TCP_server__select__ST.cpp.s
-.PHONY : TCP_server__select__ST.cpp.s
+TCP__Client__Low__HP.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__HP.dir/build.make src/CMakeFiles/TCP__Client__Low__HP.dir/TCP__Client__Low__HP.cpp.s
+.PHONY : TCP__Client__Low__HP.cpp.s
+
+TCP__Client__Low__ST.o: TCP__Client__Low__ST.cpp.o
+.PHONY : TCP__Client__Low__ST.o
+
+# target to build an object file
+TCP__Client__Low__ST.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__ST.dir/build.make src/CMakeFiles/TCP__Client__Low__ST.dir/TCP__Client__Low__ST.cpp.o
+.PHONY : TCP__Client__Low__ST.cpp.o
+
+TCP__Client__Low__ST.i: TCP__Client__Low__ST.cpp.i
+.PHONY : TCP__Client__Low__ST.i
+
+# target to preprocess a source file
+TCP__Client__Low__ST.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__ST.dir/build.make src/CMakeFiles/TCP__Client__Low__ST.dir/TCP__Client__Low__ST.cpp.i
+.PHONY : TCP__Client__Low__ST.cpp.i
+
+TCP__Client__Low__ST.s: TCP__Client__Low__ST.cpp.s
+.PHONY : TCP__Client__Low__ST.s
+
+# target to generate assembly for a file
+TCP__Client__Low__ST.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__ST.dir/build.make src/CMakeFiles/TCP__Client__Low__ST.dir/TCP__Client__Low__ST.cpp.s
+.PHONY : TCP__Client__Low__ST.cpp.s
+
+TCP__Client__Mid__HP.o: TCP__Client__Mid__HP.cpp.o
+.PHONY : TCP__Client__Mid__HP.o
+
+# target to build an object file
+TCP__Client__Mid__HP.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__HP.dir/build.make src/CMakeFiles/TCP__Client__Mid__HP.dir/TCP__Client__Mid__HP.cpp.o
+.PHONY : TCP__Client__Mid__HP.cpp.o
+
+TCP__Client__Mid__HP.i: TCP__Client__Mid__HP.cpp.i
+.PHONY : TCP__Client__Mid__HP.i
+
+# target to preprocess a source file
+TCP__Client__Mid__HP.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__HP.dir/build.make src/CMakeFiles/TCP__Client__Mid__HP.dir/TCP__Client__Mid__HP.cpp.i
+.PHONY : TCP__Client__Mid__HP.cpp.i
+
+TCP__Client__Mid__HP.s: TCP__Client__Mid__HP.cpp.s
+.PHONY : TCP__Client__Mid__HP.s
+
+# target to generate assembly for a file
+TCP__Client__Mid__HP.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__HP.dir/build.make src/CMakeFiles/TCP__Client__Mid__HP.dir/TCP__Client__Mid__HP.cpp.s
+.PHONY : TCP__Client__Mid__HP.cpp.s
+
+TCP__Client__Mid__ST.o: TCP__Client__Mid__ST.cpp.o
+.PHONY : TCP__Client__Mid__ST.o
+
+# target to build an object file
+TCP__Client__Mid__ST.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__ST.dir/build.make src/CMakeFiles/TCP__Client__Mid__ST.dir/TCP__Client__Mid__ST.cpp.o
+.PHONY : TCP__Client__Mid__ST.cpp.o
+
+TCP__Client__Mid__ST.i: TCP__Client__Mid__ST.cpp.i
+.PHONY : TCP__Client__Mid__ST.i
+
+# target to preprocess a source file
+TCP__Client__Mid__ST.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__ST.dir/build.make src/CMakeFiles/TCP__Client__Mid__ST.dir/TCP__Client__Mid__ST.cpp.i
+.PHONY : TCP__Client__Mid__ST.cpp.i
+
+TCP__Client__Mid__ST.s: TCP__Client__Mid__ST.cpp.s
+.PHONY : TCP__Client__Mid__ST.s
+
+# target to generate assembly for a file
+TCP__Client__Mid__ST.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__ST.dir/build.make src/CMakeFiles/TCP__Client__Mid__ST.dir/TCP__Client__Mid__ST.cpp.s
+.PHONY : TCP__Client__Mid__ST.cpp.s
+
+TCP__Server__Low__HP.o: TCP__Server__Low__HP.cpp.o
+.PHONY : TCP__Server__Low__HP.o
+
+# target to build an object file
+TCP__Server__Low__HP.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__HP.dir/build.make src/CMakeFiles/TCP__Server__Low__HP.dir/TCP__Server__Low__HP.cpp.o
+.PHONY : TCP__Server__Low__HP.cpp.o
+
+TCP__Server__Low__HP.i: TCP__Server__Low__HP.cpp.i
+.PHONY : TCP__Server__Low__HP.i
+
+# target to preprocess a source file
+TCP__Server__Low__HP.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__HP.dir/build.make src/CMakeFiles/TCP__Server__Low__HP.dir/TCP__Server__Low__HP.cpp.i
+.PHONY : TCP__Server__Low__HP.cpp.i
+
+TCP__Server__Low__HP.s: TCP__Server__Low__HP.cpp.s
+.PHONY : TCP__Server__Low__HP.s
+
+# target to generate assembly for a file
+TCP__Server__Low__HP.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__HP.dir/build.make src/CMakeFiles/TCP__Server__Low__HP.dir/TCP__Server__Low__HP.cpp.s
+.PHONY : TCP__Server__Low__HP.cpp.s
+
+TCP__Server__Low__ST.o: TCP__Server__Low__ST.cpp.o
+.PHONY : TCP__Server__Low__ST.o
+
+# target to build an object file
+TCP__Server__Low__ST.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__ST.dir/build.make src/CMakeFiles/TCP__Server__Low__ST.dir/TCP__Server__Low__ST.cpp.o
+.PHONY : TCP__Server__Low__ST.cpp.o
+
+TCP__Server__Low__ST.i: TCP__Server__Low__ST.cpp.i
+.PHONY : TCP__Server__Low__ST.i
+
+# target to preprocess a source file
+TCP__Server__Low__ST.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__ST.dir/build.make src/CMakeFiles/TCP__Server__Low__ST.dir/TCP__Server__Low__ST.cpp.i
+.PHONY : TCP__Server__Low__ST.cpp.i
+
+TCP__Server__Low__ST.s: TCP__Server__Low__ST.cpp.s
+.PHONY : TCP__Server__Low__ST.s
+
+# target to generate assembly for a file
+TCP__Server__Low__ST.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__ST.dir/build.make src/CMakeFiles/TCP__Server__Low__ST.dir/TCP__Server__Low__ST.cpp.s
+.PHONY : TCP__Server__Low__ST.cpp.s
+
+TCP__Server__Mid__HP.o: TCP__Server__Mid__HP.cpp.o
+.PHONY : TCP__Server__Mid__HP.o
+
+# target to build an object file
+TCP__Server__Mid__HP.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__HP.dir/build.make src/CMakeFiles/TCP__Server__Mid__HP.dir/TCP__Server__Mid__HP.cpp.o
+.PHONY : TCP__Server__Mid__HP.cpp.o
+
+TCP__Server__Mid__HP.i: TCP__Server__Mid__HP.cpp.i
+.PHONY : TCP__Server__Mid__HP.i
+
+# target to preprocess a source file
+TCP__Server__Mid__HP.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__HP.dir/build.make src/CMakeFiles/TCP__Server__Mid__HP.dir/TCP__Server__Mid__HP.cpp.i
+.PHONY : TCP__Server__Mid__HP.cpp.i
+
+TCP__Server__Mid__HP.s: TCP__Server__Mid__HP.cpp.s
+.PHONY : TCP__Server__Mid__HP.s
+
+# target to generate assembly for a file
+TCP__Server__Mid__HP.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__HP.dir/build.make src/CMakeFiles/TCP__Server__Mid__HP.dir/TCP__Server__Mid__HP.cpp.s
+.PHONY : TCP__Server__Mid__HP.cpp.s
+
+TCP__Server__Mid__ST.o: TCP__Server__Mid__ST.cpp.o
+.PHONY : TCP__Server__Mid__ST.o
+
+# target to build an object file
+TCP__Server__Mid__ST.cpp.o:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__ST.dir/build.make src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.o
+.PHONY : TCP__Server__Mid__ST.cpp.o
+
+TCP__Server__Mid__ST.i: TCP__Server__Mid__ST.cpp.i
+.PHONY : TCP__Server__Mid__ST.i
+
+# target to preprocess a source file
+TCP__Server__Mid__ST.cpp.i:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__ST.dir/build.make src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.i
+.PHONY : TCP__Server__Mid__ST.cpp.i
+
+TCP__Server__Mid__ST.s: TCP__Server__Mid__ST.cpp.s
+.PHONY : TCP__Server__Mid__ST.s
+
+# target to generate assembly for a file
+TCP__Server__Mid__ST.cpp.s:
+	cd /home/administrator/Documents/Work/Kod/cpp/socket/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__ST.dir/build.make src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.s
+.PHONY : TCP__Server__Mid__ST.cpp.s
 
 # Help Target
 help:
@@ -276,22 +428,38 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... TCP_client__select__MT"
-	@echo "... TCP_client__select__ST"
-	@echo "... TCP_server__select__MT"
-	@echo "... TCP_server__select__ST"
-	@echo "... TCP_client__select__MT.o"
-	@echo "... TCP_client__select__MT.i"
-	@echo "... TCP_client__select__MT.s"
-	@echo "... TCP_client__select__ST.o"
-	@echo "... TCP_client__select__ST.i"
-	@echo "... TCP_client__select__ST.s"
-	@echo "... TCP_server__select__MT.o"
-	@echo "... TCP_server__select__MT.i"
-	@echo "... TCP_server__select__MT.s"
-	@echo "... TCP_server__select__ST.o"
-	@echo "... TCP_server__select__ST.i"
-	@echo "... TCP_server__select__ST.s"
+	@echo "... TCP__Client__Low__HP"
+	@echo "... TCP__Client__Low__ST"
+	@echo "... TCP__Client__Mid__HP"
+	@echo "... TCP__Client__Mid__ST"
+	@echo "... TCP__Server__Low__HP"
+	@echo "... TCP__Server__Low__ST"
+	@echo "... TCP__Server__Mid__HP"
+	@echo "... TCP__Server__Mid__ST"
+	@echo "... TCP__Client__Low__HP.o"
+	@echo "... TCP__Client__Low__HP.i"
+	@echo "... TCP__Client__Low__HP.s"
+	@echo "... TCP__Client__Low__ST.o"
+	@echo "... TCP__Client__Low__ST.i"
+	@echo "... TCP__Client__Low__ST.s"
+	@echo "... TCP__Client__Mid__HP.o"
+	@echo "... TCP__Client__Mid__HP.i"
+	@echo "... TCP__Client__Mid__HP.s"
+	@echo "... TCP__Client__Mid__ST.o"
+	@echo "... TCP__Client__Mid__ST.i"
+	@echo "... TCP__Client__Mid__ST.s"
+	@echo "... TCP__Server__Low__HP.o"
+	@echo "... TCP__Server__Low__HP.i"
+	@echo "... TCP__Server__Low__HP.s"
+	@echo "... TCP__Server__Low__ST.o"
+	@echo "... TCP__Server__Low__ST.i"
+	@echo "... TCP__Server__Low__ST.s"
+	@echo "... TCP__Server__Mid__HP.o"
+	@echo "... TCP__Server__Mid__HP.i"
+	@echo "... TCP__Server__Mid__HP.s"
+	@echo "... TCP__Server__Mid__ST.o"
+	@echo "... TCP__Server__Mid__ST.i"
+	@echo "... TCP__Server__Mid__ST.s"
 .PHONY : help
 
 

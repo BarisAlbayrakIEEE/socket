@@ -117,56 +117,108 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named TCP_server__select__ST
+# Target rules for targets named TCP__Server__Low__ST
 
 # Build rule for target.
-TCP_server__select__ST: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_server__select__ST
-.PHONY : TCP_server__select__ST
+TCP__Server__Low__ST: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Server__Low__ST
+.PHONY : TCP__Server__Low__ST
 
 # fast build rule for target.
-TCP_server__select__ST/fast:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__ST.dir/build.make src/CMakeFiles/TCP_server__select__ST.dir/build
-.PHONY : TCP_server__select__ST/fast
+TCP__Server__Low__ST/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__ST.dir/build.make src/CMakeFiles/TCP__Server__Low__ST.dir/build
+.PHONY : TCP__Server__Low__ST/fast
 
 #=============================================================================
-# Target rules for targets named TCP_server__select__MT
+# Target rules for targets named TCP__Server__Low__HP
 
 # Build rule for target.
-TCP_server__select__MT: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_server__select__MT
-.PHONY : TCP_server__select__MT
+TCP__Server__Low__HP: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Server__Low__HP
+.PHONY : TCP__Server__Low__HP
 
 # fast build rule for target.
-TCP_server__select__MT/fast:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_server__select__MT.dir/build.make src/CMakeFiles/TCP_server__select__MT.dir/build
-.PHONY : TCP_server__select__MT/fast
+TCP__Server__Low__HP/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Low__HP.dir/build.make src/CMakeFiles/TCP__Server__Low__HP.dir/build
+.PHONY : TCP__Server__Low__HP/fast
 
 #=============================================================================
-# Target rules for targets named TCP_client__select__ST
+# Target rules for targets named TCP__Server__Mid__ST
 
 # Build rule for target.
-TCP_client__select__ST: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_client__select__ST
-.PHONY : TCP_client__select__ST
+TCP__Server__Mid__ST: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Server__Mid__ST
+.PHONY : TCP__Server__Mid__ST
 
 # fast build rule for target.
-TCP_client__select__ST/fast:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__ST.dir/build.make src/CMakeFiles/TCP_client__select__ST.dir/build
-.PHONY : TCP_client__select__ST/fast
+TCP__Server__Mid__ST/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__ST.dir/build.make src/CMakeFiles/TCP__Server__Mid__ST.dir/build
+.PHONY : TCP__Server__Mid__ST/fast
 
 #=============================================================================
-# Target rules for targets named TCP_client__select__MT
+# Target rules for targets named TCP__Server__Mid__HP
 
 # Build rule for target.
-TCP_client__select__MT: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP_client__select__MT
-.PHONY : TCP_client__select__MT
+TCP__Server__Mid__HP: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Server__Mid__HP
+.PHONY : TCP__Server__Mid__HP
 
 # fast build rule for target.
-TCP_client__select__MT/fast:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP_client__select__MT.dir/build.make src/CMakeFiles/TCP_client__select__MT.dir/build
-.PHONY : TCP_client__select__MT/fast
+TCP__Server__Mid__HP/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Server__Mid__HP.dir/build.make src/CMakeFiles/TCP__Server__Mid__HP.dir/build
+.PHONY : TCP__Server__Mid__HP/fast
+
+#=============================================================================
+# Target rules for targets named TCP__Client__Low__ST
+
+# Build rule for target.
+TCP__Client__Low__ST: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Client__Low__ST
+.PHONY : TCP__Client__Low__ST
+
+# fast build rule for target.
+TCP__Client__Low__ST/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__ST.dir/build.make src/CMakeFiles/TCP__Client__Low__ST.dir/build
+.PHONY : TCP__Client__Low__ST/fast
+
+#=============================================================================
+# Target rules for targets named TCP__Client__Low__HP
+
+# Build rule for target.
+TCP__Client__Low__HP: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Client__Low__HP
+.PHONY : TCP__Client__Low__HP
+
+# fast build rule for target.
+TCP__Client__Low__HP/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Low__HP.dir/build.make src/CMakeFiles/TCP__Client__Low__HP.dir/build
+.PHONY : TCP__Client__Low__HP/fast
+
+#=============================================================================
+# Target rules for targets named TCP__Client__Mid__ST
+
+# Build rule for target.
+TCP__Client__Mid__ST: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Client__Mid__ST
+.PHONY : TCP__Client__Mid__ST
+
+# fast build rule for target.
+TCP__Client__Mid__ST/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__ST.dir/build.make src/CMakeFiles/TCP__Client__Mid__ST.dir/build
+.PHONY : TCP__Client__Mid__ST/fast
+
+#=============================================================================
+# Target rules for targets named TCP__Client__Mid__HP
+
+# Build rule for target.
+TCP__Client__Mid__HP: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TCP__Client__Mid__HP
+.PHONY : TCP__Client__Mid__HP
+
+# fast build rule for target.
+TCP__Client__Mid__HP/fast:
+	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/TCP__Client__Mid__HP.dir/build.make src/CMakeFiles/TCP__Client__Mid__HP.dir/build
+.PHONY : TCP__Client__Mid__HP/fast
 
 # Help Target
 help:
@@ -176,10 +228,14 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... TCP_client__select__MT"
-	@echo "... TCP_client__select__ST"
-	@echo "... TCP_server__select__MT"
-	@echo "... TCP_server__select__ST"
+	@echo "... TCP__Client__Low__HP"
+	@echo "... TCP__Client__Low__ST"
+	@echo "... TCP__Client__Mid__HP"
+	@echo "... TCP__Client__Mid__ST"
+	@echo "... TCP__Server__Low__HP"
+	@echo "... TCP__Server__Low__ST"
+	@echo "... TCP__Server__Mid__HP"
+	@echo "... TCP__Server__Mid__ST"
 .PHONY : help
 
 

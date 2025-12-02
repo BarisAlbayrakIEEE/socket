@@ -1,9 +1,13 @@
 /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles/edit_cache.dir
 /home/administrator/Documents/Work/Kod/cpp/socket/build/CMakeFiles/rebuild_cache.dir
-/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP_server__select__ST.dir
-/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP_server__select__MT.dir
-/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP_client__select__ST.dir
-/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP_client__select__MT.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Server__Low__ST.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Server__Low__HP.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Server__Mid__ST.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Server__Mid__HP.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Client__Low__ST.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Client__Low__HP.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Client__Mid__ST.dir
+/home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/TCP__Client__Mid__HP.dir
 /home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/edit_cache.dir
 /home/administrator/Documents/Work/Kod/cpp/socket/build/src/CMakeFiles/rebuild_cache.dir
 /home/administrator/Documents/Work/Kod/cpp/socket/build/test/CMakeFiles/edit_cache.dir
