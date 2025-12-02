@@ -45,7 +45,7 @@
     #define ERROR_INTERRUPTED  (WSAEINTR)
     #define ERROR_BLOCKED      (WSAEWOULDBLOCK)
 
-    #define SOCKET_ERROR__POLL() \
+    #define SOCKET_ERROR__MID() \
         fprintf(stderr, "[WSAPoll() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #else
     #include <sys/types.h>
@@ -69,7 +69,7 @@
     #define ERROR_INTERRUPTED  (EINTR)
     #define ERROR_BLOCKED      (EAGAIN)
 
-    #define SOCKET_ERROR__POLL() \
+    #define SOCKET_ERROR__MID() \
         fprintf(stderr, "[poll() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #endif
 #if !defined(IPV6_V6ONLY)
@@ -115,7 +115,7 @@
         fprintf(stderr, "[send() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
     #define SOCKET_ERROR__CONNECT() \
         fprintf(stderr, "[connect() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
-    #define SOCKET_ERROR__SELECT() \
+    #define SOCKET_ERROR__LOW() \
         fprintf(stderr, "[select() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #else
     static const bool is_debug_mode = false;
@@ -155,7 +155,7 @@
         throw std::runtime_error(std::string("[send() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
     #define SOCKET_ERROR__CONNECT() \
         throw std::runtime_error(std::string("[connect() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
-    #define SOCKET_ERROR__SELECT() \
+    #define SOCKET_ERROR__LOW() \
         throw std::runtime_error(std::string("[select() error] ") + ": " + strerror(GET_SOCKET_ERRNO()))
 #endif
 

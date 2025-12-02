@@ -1,8 +1,12 @@
-// Event_Loop__Poll__MT.hpp
-// Multi-threaded poll event loop
+// Event_Loop__Mid__HP.hpp :
+//   Platform                 : Cross-platform
+//   Performance              : Mid (poll-based configuration)
+//   Concurrency              :
+//     Event loop             : Single-threaded
+//     Handler execution      : Parallel
 
-#ifndef EVENT_LOOP__POLL__MT_HPP
-#define EVENT_LOOP__POLL__MT_HPP
+#ifndef EVENT_LOOP__MID__HP_HPP
+#define EVENT_LOOP__MID__HP_HPP
 
 #include <unordered_map>
 #include <vector>
@@ -11,39 +15,35 @@
 #include <optional>
 #include "poll_setup.hpp"
 #include "IEvent_Loop.hpp"
-#include "Handler.hpp"
+#include "Event_Handler.hpp"
 
 namespace BA_Socket {
-    template <template <typename> typename Concurrent_Queue_Type>
-    void execute_job(
-        const Job& job,
-        Concurrent_Queue_Type<job_result_t>& job_results)
-    {
-        auto rcp = std::move(job._handler->apply(job._fd));
-        for (auto& rc : rcp) {
-            job_results.push(std::move(rc));
-        }
-    };
-
     template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
         requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    class Event_Loop__Poll__MT : public IEvent_Loop {
+    class Event_Loop<
+        Enum_Event_Loop_Types::Mid,
+        Enum_Concurrency_Types::HP,
+        Thread_Pool_Type,
+        Job,
+        job_result_t>
+            : public IEvent_Loop
+    {
     public:
-        Event_Loop__Poll__MT(
-            int msec = -1,
+        Event_Loop(
+            timeout_x msec = -1,
             size_t thread_count = std::thread::hardware_concurrency())
                 : _msec(msec), _tp(thread_count == 0 ? 1 : thread_count) {}
 
-        inline void fd_register(int fd, Enum_Event_Types event_type) override {
-            if (event_type == Enum_Event_Types::None) return;
+        inline void fd_register(int fd, Enum_IO_Event_Types event_type) override {
+            if (event_type == Enum_IO_Event_Types::None) return;
 
             short events = 0;
-            if (event_type == Enum_Event_Types::Read) {
-                events |= POLL_IN;
-            } else if (event_type == Enum_Event_Types::Write) {
-                events |= POLL_OUT;
+            if (event_type == Enum_IO_Event_Types::Read) {
+                events |= POLL_X_IN;
+            } else if (event_type == Enum_IO_Event_Types::Write) {
+                events |= POLL_X_OUT;
             } else { // Read_Write
-                events |= POLL_IN | POLL_OUT;
+                events |= POLL_X_IN | POLL_X_OUT;
             }
 
             // update or add pollfd
@@ -69,18 +69,18 @@ namespace BA_Socket {
                     _pollfds.end(),
                     [fd](const pollfd_t& pollfd_){ return pollfd_.fd == fd; }),
                 _pollfds.end());
-            _handler_entrys.erase(fd);
+            _event_handler_entrys.erase(fd);
         }
 
-        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
+        inline void add_event_handler(int fd, event_handler_ptr_t&& handler, Enum_IO_Event_Types event_type) {
             if (!handler) return;
-            if (event_type == Enum_Event_Types::None) return;
+            if (event_type == Enum_IO_Event_Types::None) return;
 
-            auto& handler_entry = _handler_entrys[fd];
-            if (event_type == Enum_Event_Types::Read) {
-                handler_entry._handler__read = std::move(handler);
-            } else if (event_type == Enum_Event_Types::Write) {
-                handler_entry._handler__write = std::move(handler);
+            auto& event_handler_entry = _event_handler_entrys[fd];
+            if (event_type == Enum_IO_Event_Types::Read) {
+                event_handler_entry._event_handler__read = std::move(handler);
+            } else if (event_type == Enum_IO_Event_Types::Write) {
+                event_handler_entry._event_handler__write = std::move(handler);
             }
         }
 
@@ -93,13 +93,13 @@ namespace BA_Socket {
 
                 // perform poll operation
                 std::vector<pollfd_t> pollfds_copy = _pollfds;
-                int status = poll_execute(
+                int status = poll_x(
                     pollfds_copy.data(),
-                    static_cast<nfds_t>(pollfds_copy.size()),
+                    static_cast<nfds_x>(pollfds_copy.size()),
                     _msec);
                 if (status < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
-                    SOCKET_ERROR__POLL();
+                    SOCKET_ERROR__MID();
                     break;
                 }
                 if (status == 0) continue; // timeout
@@ -110,8 +110,8 @@ namespace BA_Socket {
                 // submit the jobs via the thread pool - multiple threads
                 submit_jobs();
 
-                // apply the next reactor commands returned from the current handlers in the map - single thread
-                apply_reactor_commands();
+                // apply the reactor events - single thread
+                apply_reactor_events();
             }
         };
 
@@ -121,19 +121,19 @@ namespace BA_Socket {
 
     private:
 
-        // get the handler entry from the pollfd
-        inline Handler_Entry* get_handler_entry_ptr(const pollfd_t & pollfd_) {
+        // get the event handler entry from the pollfd
+        inline Event_Handler_Entry* get_event_handler_entry_ptr(const pollfd_t & pollfd_) {
             if (pollfd_.revents == 0) return nullptr;
             if (!IS_VALID_SOCKET(pollfd_.fd)) return nullptr;
 #if defined(_WIN32)
             if (pollfd_.fd == 0 && !_kbhit()) return nullptr;
 #endif
 
-            auto it = _handler_entrys.find(pollfd_.fd);
-            if (it == _handler_entrys.end()) return nullptr;
-            auto& handler_entry = it->second;
-            if (!handler_entry._active) return nullptr;
-            return &handler_entry;
+            auto it = _event_handler_entrys.find(pollfd_.fd);
+            if (it == _event_handler_entrys.end()) return nullptr;
+            auto& event_handler_entry = it->second;
+            if (!event_handler_entry._active) return nullptr;
+            return &event_handler_entry;
         }
 
         // create jobs from the current handler entry map
@@ -141,16 +141,16 @@ namespace BA_Socket {
             const std::vector<pollfd_t>& pollfds_copy)
         {
             for (const auto& pollfd_ : pollfds_copy) {
-                // get the handler entry from the pollfd
-                auto handler_entry_ptr = get_handler_entry_ptr(pollfd_);
-                if (!handler_entry_ptr) continue;
+                // get the event handler entry from the pollfd
+                auto event_handler_entry_ptr = get_event_handler_entry_ptr(pollfd_);
+                if (!event_handler_entry_ptr) continue;
 
                 // add the new jobs into _jobs
-                if ((pollfd_.revents & POLL_IN) && handler_entry_ptr->_handler__read) {
-                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__read));
+                if ((pollfd_.revents & POLL_X_IN) && event_handler_entry_ptr->_event_handler__read) {
+                    _jobs.push(Job(pollfd_.fd, event_handler_entry_ptr->_event_handler__read));
                 }
-                if ((pollfd_.revents & POLL_OUT) && handler_entry_ptr->_handler__write) {
-                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__write));
+                if ((pollfd_.revents & POLL_X_OUT) && event_handler_entry_ptr->_event_handler__write) {
+                    _jobs.push(Job(pollfd_.fd, event_handler_entry_ptr->_event_handler__write));
                 }
             }
         }
@@ -170,15 +170,15 @@ namespace BA_Socket {
             }
         }
 
-        // apply the next reactor commands returned from the current handlers in the map.
+        // apply the reactor events.
         // notice that this function is executed in the main thread,
         // and starts with a call to wait_all_jobs on the thread pool.
         // hence, the operations on _job_results are single-threaded and safe (especially _job_results.empty()).
-        void apply_reactor_commands() {
+        void apply_reactor_events() {
             // wait till all workers finish
             _tp.wait_all_jobs();
 
-            // apply the reactor commands
+            // apply the reactor events
             while (!_job_results.empty()) {
                 auto job_result{ _job_results.pop() };
                 if (!job_result.has_value()) continue;
@@ -194,19 +194,28 @@ namespace BA_Socket {
                     handler_command_type == Enum_Handler_Command_Types::Add ||
                     handler_command_type == Enum_Handler_Command_Types::Replace)
                 {
-                    add_handler(fd, std::move(handler__new), event_type);
+                    add_event_handler(fd, std::move(handler__new), event_type);
                 }
             }
         }
 
-        std::unordered_map<int, Handler_Entry> _handler_entrys;
+        std::unordered_map<int, Event_Handler_Entry> _event_handler_entrys;
         std::vector<pollfd_t> _pollfds;
         Concurrent_Queue_Type<Job> _jobs;
         Concurrent_Queue_Type<job_result_t> _job_results;
         Thread_Pool_Type _tp;
-        int _msec{ -1 };
+        timeout_x _msec{ -1 };
         std::atomic<bool> _running{ false };
     };
+
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    using Event_Loop__Mid__HP = Event_Loop<
+        Enum_Event_Loop_Types::Mid,
+        Enum_Concurrency_Types::HP,
+        Thread_Pool_Type,
+        Job,
+        job_result_t>;
 } // namespace BA_Socket
 
-#endif // EVENT_LOOP__POLL__MT_HPP
+#endif // EVENT_LOOP__MID__HP_HPP

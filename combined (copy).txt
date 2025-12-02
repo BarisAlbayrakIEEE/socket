@@ -1,3 +1,44 @@
+# ./CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.22)
+project(BA_Socket LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# directories
+set(_INC_DIR ${PROJECT_SOURCE_DIR}/inc)
+set(_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
+set(_CONCURRENT_INC_DIR ${PROJECT_SOURCE_DIR}/../lock_free)
+set(_GTEST_INC_DIR /usr/src/googletest/googletest)
+set(_GTEST_LIB_DIR /usr/src/googletest/googletest/build/lib)
+set(_BENCKMARK_INC_DIR /usr/src/googlebenchmark/benchmark/include/benchmark)
+set(_BENCKMARK_LIB_DIR /usr/src/googlebenchmark/benchmark/build/lib)
+
+set(_INC_DIR ${_INC_DIR} PARENT_SCOPE)
+set(_SRC_DIR ${_INC_DIR} PARENT_SCOPE)
+set(_CONCURRENT_INC_DIR ${_CONCURRENT_INC_DIR} PARENT_SCOPE)
+set(_GTEST_INC_DIR ${_GTEST_INC_DIR} PARENT_SCOPE)
+set(_GTEST_LIB_DIR ${_GTEST_LIB_DIR} PARENT_SCOPE)
+set(_BENCKMARK_INC_DIR ${_BENCKMARK_INC_DIR} PARENT_SCOPE)
+set(_BENCKMARK_LIB_DIR ${_BENCKMARK_LIB_DIR} PARENT_SCOPE)
+
+# subdirectories
+add_subdirectory(src)
+add_subdirectory(test)
+add_subdirectory(benchmark)
+
+#config
+set(BA_Socket_VERSION_MAJOR 1)
+set(BA_Socket_VERSION_MINOR 0)
+
+configure_file(
+  config/BA_Socket_Config.h.in
+  config/BA_Socket_Config.h
+)
+
+
 // Event_Loop__Select__MT.hpp
 // Multi-threaded select event loop
 
@@ -13,6 +54,17 @@
 #include "Handler.hpp"
 
 namespace BA_Socket {
+    template <template <typename> typename Concurrent_Queue_Type>
+    void execute_job(
+        const Job& job,
+        Concurrent_Queue_Type<job_result_t>& job_results)
+    {
+        auto rcp = std::move(job._handler->apply(job._fd));
+        for (auto& rc : rcp) {
+            job_results.push(std::move(rc));
+        }
+    };
+
     template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
         requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
     class Event_Loop__Select__MT : public IEvent_Loop {
@@ -652,63 +704,6 @@ namespace BA_Socket {
 } // namespace BA_Socket
 
 #endif // TCP_SERVER__SELECT__ST_HPP
-
-
-// TCP_server__poll__ST.hpp
-
-#ifndef TCP_SERVER__POLL__ST_HPP
-#define TCP_SERVER__POLL__ST_HPP
-
-#include "Socket.hpp"
-#include "Event_Loop__Poll__ST.hpp"
-#include <ctype.h>
-#include <algorithm>
-
-namespace BA_Socket {
-    inline bool to_up(std::string& str) {
-        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
-        return true;
-    }
-
-    int TCP_server__poll__ST_helper() {
-        // create the server socket and bind to the local address
-        PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
-        Socket socket_listen = create_socket_bind_to_local_addr("all");
-        if (!socket_listen.is_valid()) return 1;
-        SOCKET fd_listen = socket_listen.native_handle();
-
-        // listen for connections
-        PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
-        if (!socket_listen.listen(10)) return 1;
-
-        // create the event looop
-        Event_Loop__Poll__ST el{};
-        el.fd_register(fd_listen, Enum_Event_Types::Read);
-#ifdef SEPARATE_READ_WRITE
-        el.add_handler(
-            fd_listen,
-            std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(&to_up),
-            Enum_Event_Types::Read);
-#else
-        el.add_handler(
-            fd_listen,
-            std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(&to_up),
-            Enum_Event_Types::Read);
-#endif
-        el.run();
-
-        return 0;
-    }
-    
-    inline int TCP_server__poll__ST() {
-        SOCKET_STARTUP();
-        int status = TCP_server__poll__ST_helper();
-        SOCKET_CLEANUP();
-        return status;
-    }
-} // namespace BA_Socket
-
-#endif // TCP_SERVER__POLL__ST_HPP
 
 
 // core.hpp
@@ -2082,168 +2077,6 @@ namespace BA_Socket {
 #endif // TCP_CLIENT__SELECT__ST_HPP
 
 
-// TCP_client__poll__MT.hpp
-
-#ifndef TCP_CLIENT__POLL__MT_HPP
-#define TCP_CLIENT__POLL__MT_HPP
-
-#include "Socket.hpp"
-#include "Event_Loop__Poll__MT.hpp"
-#include <ctype.h>
-
-using namespace BA_Concurrency;
-
-namespace BA_Socket {
-    inline bool write_to_stdout(const std::string& buffer) {
-        printf("[Client]: Received (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
-        return true;
-    }
-
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    int TCP_client__poll__MT_helper(
-        const std::string& hostname = "localhost",
-        uint16_t port = 8080,
-        int family = AF_INET6)
-    {
-        using EL_t = Event_Loop__Poll__MT<
-            Concurrent_Queue_Type,
-            Thread_Pool_Type>;
-
-        // obtain the peer address
-        struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
-        if (!peer_addr) return 1;
-
-        // print the peer address
-        print_addrinfo<is_debug_mode>(peer_addr);
-
-        // create the peer socket
-        PRINTF1("[Client]: Creating the peer socket...\n");
-        Socket socket_peer {
-            peer_addr->ai_family,
-            peer_addr->ai_socktype,
-            peer_addr->ai_protocol};
-        if (!socket_peer.is_valid()) {
-            SOCKET_ERROR__SOCKET();
-            ::freeaddrinfo(peer_addr);
-            return 1;
-        }
-        SOCKET fd_peer = socket_peer.native_handle();
-
-        // connect to the remote server
-        PRINTF1("[Client]: Connecting to the remote server...\n");
-        if (socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen) < 0) {
-            ::freeaddrinfo(peer_addr);
-            return 1;
-        }
-        ::freeaddrinfo(peer_addr);
-
-        // inform the user
-        PRINTF1("[Client]: Connected to the remote server.\n");
-        PRINTF1("[Client]: To send data, enter text followed by enter.\n");
-
-        // create the event looop
-        EL_t el{ 100, std::thread::hardware_concurrency() };
-        el.fd_register(0, Enum_Event_Types::Read);
-        el.add_handler(
-            0,
-            std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
-            Enum_Event_Types::Read);
-
-        el.fd_register(fd_peer, Enum_Event_Types::Read);
-        el.add_handler(
-            fd_peer,
-            std::make_unique<Handler_Read_Forward<string_forward_t>>(&write_to_stdout),
-            Enum_Event_Types::Read);
-        el.run();
-
-        return 0;
-    }
-    
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    inline int TCP_client__poll__MT(
-        const std::string& hostname = "localhost",
-        uint16_t port = 8080,
-        int family = AF_INET6)
-    {
-        SOCKET_STARTUP();
-        int status = TCP_client__poll__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>(hostname, port, family);
-        SOCKET_CLEANUP();
-        return status;
-    }
-} // namespace BA_Socket
-
-#endif // TCP_CLIENT__POLL__MT_HPP
-
-
-// TCP_server__poll__MT.hpp
-
-#ifndef TCP_SERVER__POLL__MT_HPP
-#define TCP_SERVER__POLL__MT_HPP
-
-#include "Socket.hpp"
-#include "Event_Loop__Poll__MT.hpp"
-#include <ctype.h>
-#include <algorithm>
-
-using namespace BA_Concurrency;
-
-namespace BA_Socket {
-    inline bool to_up(std::string& str) {
-        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
-        return true;
-    }
-
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    int TCP_server__poll__MT_helper() {
-        using EL_t = Event_Loop__Poll__MT<
-            Concurrent_Queue_Type,
-            Thread_Pool_Type>;
-
-        // create the server socket and bind to the local address
-        PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
-        Socket socket_listen = create_socket_bind_to_local_addr("all");
-        if (!socket_listen.is_valid()) return 1;
-        SOCKET fd_listen = socket_listen.native_handle();
-
-        // listen for connections
-        PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
-        if (!socket_listen.listen(10)) return 1;
-
-        // create the event looop
-        EL_t el{};
-        el.fd_register(fd_listen, Enum_Event_Types::Read);
-#ifdef SEPARATE_READ_WRITE
-        el.add_handler(
-            fd_listen,
-            std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(&to_up),
-            Enum_Event_Types::Read);
-#else
-        el.add_handler(
-            fd_listen,
-            std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(&to_up),
-            Enum_Event_Types::Read);
-#endif
-        el.run();
-
-        return 0;
-    }
-    
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    inline int TCP_server__poll__MT() {
-        SOCKET_STARTUP();
-        int status = TCP_server__poll__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>();
-        SOCKET_CLEANUP();
-        return status;
-    }
-} // namespace BA_Socket
-
-#endif // TCP_SERVER__POLL__MT_HPP
-
-
 // Reactor_Command.hpp
 
 #ifndef REACTOR_COMMAND_HPP
@@ -2345,17 +2178,6 @@ namespace BA_Socket {
     };
     using job_result_t = Reactor_Command;
     using job_result_pack_t = std::vector<job_result_t>;
-
-    template <template <typename> typename Concurrent_Queue_Type>
-    void execute_job(
-        const Job& job,
-        Concurrent_Queue_Type<job_result_t>& job_results)
-    {
-        auto rcp = std::move(job._handler->apply(job._fd));
-        for (auto& rc : rcp) {
-            job_results.push(std::move(rc));
-        }
-    };
 
     // forward declerations for the handlers
     struct Handler_Write;
@@ -2644,91 +2466,6 @@ namespace BA_Socket {
 #endif // UTILITY_ADDR_HPP
 
 
-// TCP_client__poll__ST.hpp
-
-#ifndef TCP_CLIENT__POLL__ST_HPP
-#define TCP_CLIENT__POLL__ST_HPP
-
-#include "Socket.hpp"
-#include "Event_Loop__Poll__ST.hpp"
-#include <ctype.h>
-
-namespace BA_Socket {
-    inline bool write_to_stdout(const std::string& buffer) {
-        printf("[Client]: Received (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
-        return true;
-    }
-
-    int TCP_client__poll__ST_helper(
-        const std::string& hostname = "localhost",
-        uint16_t port = 8080,
-        int family = AF_INET6)
-    {
-        // obtain the peer address
-        struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
-        if (!peer_addr) return 1;
-
-        // print the peer address
-        print_addrinfo<is_debug_mode>(peer_addr);
-
-        // create the peer socket
-        PRINTF1("[Client]: Creating the peer socket...\n");
-        Socket socket_peer {
-            peer_addr->ai_family,
-            peer_addr->ai_socktype,
-            peer_addr->ai_protocol};
-        if (!socket_peer.is_valid()) {
-            SOCKET_ERROR__SOCKET();
-            ::freeaddrinfo(peer_addr);
-            return 1;
-        }
-        SOCKET fd_peer = socket_peer.native_handle();
-
-        // connect to the remote server
-        PRINTF1("[Client]: Connecting to the remote server...\n");
-        if (socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen) < 0) {
-            ::freeaddrinfo(peer_addr);
-            return 1;
-        }
-        ::freeaddrinfo(peer_addr);
-
-        // inform the user
-        PRINTF1("[Client]: Connected to the remote server.\n");
-        PRINTF1("[Client]: To send data, enter text followed by enter.\n");
-
-        // create the event looop
-        Event_Loop__Poll__ST el{ 100 };
-        el.fd_register(0, Enum_Event_Types::Read);
-        el.add_handler(
-            0,
-            std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
-            Enum_Event_Types::Read);
-
-        el.fd_register(fd_peer, Enum_Event_Types::Read);
-        el.add_handler(
-            fd_peer,
-            std::make_unique<Handler_Read_Forward<string_forward_t>>(&write_to_stdout),
-            Enum_Event_Types::Read);
-        el.run();
-
-        return 0;
-    }
-    
-    inline int TCP_client__poll__ST(
-        const std::string& hostname = "localhost",
-        uint16_t port = 8080,
-        int family = AF_INET6)
-    {
-        SOCKET_STARTUP();
-        int status = TCP_client__poll__ST_helper(hostname, port, family);
-        SOCKET_CLEANUP();
-        return status;
-    }
-} // namespace BA_Socket
-
-#endif // TCP_CLIENT__POLL__ST_HPP
-
-
 // IEvent_Loop.hpp
 
 #ifndef IEVENT_LOOP_HPP
@@ -2753,431 +2490,74 @@ namespace BA_Socket {
 #endif // IEVENT_LOOP_HPP
 
 
-// Event_Loop__Poll.hpp
+// TCP_client__select__ST.cpp
 
-#ifndef EVENT_LOOP__POLL__ST_HPP
-#define EVENT_LOOP__POLL__ST_HPP
+#include "TCP_client__select__ST.hpp"
+using namespace BA_Socket;
 
-#include <unordered_map>
-#include <vector>
-#include <atomic>
-#include "poll_setup.hpp"
-#include "IEvent_Loop.hpp"
-#include "Handler.hpp"
-
-namespace BA_Socket {
-
-    class Event_Loop__Poll__ST : public IEvent_Loop {
-    public:
-        Event_Loop__Poll__ST(timeout_x msec = -1) : _msec(msec) {}
-
-        inline void fd_register(int fd, Enum_Event_Types event_type) override {
-            if (event_type == Enum_Event_Types::None) return;
-
-            short events = 0;
-            if (event_type == Enum_Event_Types::Read) {
-                events |= POLL_X_IN;
-            } else if (event_type == Enum_Event_Types::Write) {
-                events |= POLL_X_OUT;
-            } else { // Read_Write
-                events |= POLL_X_IN | POLL_X_OUT;
-            }
-
-            // update or add pollfd
-            auto it = std::find_if(
-                _pollfds.begin(),
-                _pollfds.end(),
-                [fd](const auto& pollfd_){ return pollfd_.fd == fd; });
-            if (it != _pollfds.end()) {
-                it->events |= events;
-            } else {
-                pollfd_x pollfd_{};
-                pollfd_.fd = fd;
-                pollfd_.events = events;
-                pollfd_.revents = 0;
-                _pollfds.push_back(pollfd_);
-            }
-        }
-
-        inline void fd_unregister(int fd) override {
-            _pollfds.erase(
-                std::remove_if(
-                    _pollfds.begin(),
-                    _pollfds.end(),
-                    [fd](const pollfd_x& pollfd_){ return pollfd_.fd == fd; }),
-                _pollfds.end());
-            _handler_entrys.erase(fd);
-        }
-
-        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
-            if (!handler) return;
-            if (event_type == Enum_Event_Types::None) return;
-
-            auto& handler_entry = _handler_entrys[fd];
-            if (event_type == Enum_Event_Types::Read) {
-                handler_entry._handler__read = std::move(handler);
-            } else if (event_type == Enum_Event_Types::Write) {
-                handler_entry._handler__write = std::move(handler);
-            }
-        }
-
-        inline void run() override {
-            _running.store(true);
-            while (_running.load()) {
-                if (_pollfds.empty()) break;
-
-                // perform poll operation
-                std::vector<pollfd_x> pollfds_copy = _pollfds;
-                int status = poll_x(
-                    pollfds_copy.data(),
-                    static_cast<nfds_x>(pollfds_copy.size()),
-                    _msec);
-                if (status < 0) {
-                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
-                    SOCKET_ERROR__POLL();
-                    break;
-                }
-                if (status == 0) continue; // timeout
-
-                // execute the handlers in the handler entry map
-                reactor_command_pack_t rcp_next;
-                execute_handlers(rcp_next, pollfds_copy);
-
-                // apply the next reactor commands returned from the current handlers in the map
-                apply_reactor_commands(rcp_next);
-            }
-        }
-
-        inline void stop() override {
-            _running.store(false);
-        }
-
-    private:
-
-        // get the handler entry from the pollfd
-        inline Handler_Entry* get_handler_entry_ptr(const pollfd_x & pollfd_) {
-            if (pollfd_.revents == 0) return nullptr;
-            if (!IS_VALID_SOCKET(pollfd_.fd)) return nullptr;
-#if defined(_WIN32)
-            if (pollfd_.fd == 0 && !_kbhit()) return nullptr;
-#endif
-
-            auto it = _handler_entrys.find(pollfd_.fd);
-            if (it == _handler_entrys.end()) return nullptr;
-            auto& handler_entry = it->second;
-            if (!handler_entry._active) return nullptr;
-            return &handler_entry;
-        }
-
-        // execute the handlers in the handler entry map
-        void execute_handlers(
-            reactor_command_pack_t& rcp_next,
-            const std::vector<pollfd_x>& pollfds_copy)
-        {
-            for (const auto& pollfd_ : pollfds_copy) {
-                // get the handler entry from the pollfd
-                auto handler_entry_ptr = get_handler_entry_ptr(pollfd_);
-                if (!handler_entry_ptr) continue;
-
-                // execute the read handler
-                if ((pollfd_.revents & POLL_X_IN) && handler_entry_ptr->_handler__read) {
-                    auto rcp = handler_entry_ptr->_handler__read->apply(pollfd_.fd);
-                    for (auto& rc : rcp) {
-                        if (rc._register_type == Enum_Register_Types::Unregister) {
-                            handler_entry_ptr->_active = false;
-                        }
-                        rcp_next.push_back(std::move(rc));
-                    }
-                }
-
-                // execute the write handler
-                if ((pollfd_.revents & POLL_X_OUT) && handler_entry_ptr->_handler__write) {
-                    auto rcp = handler_entry_ptr->_handler__write->apply(pollfd_.fd);
-                    for (auto& rc : rcp) {
-                        if (rc._register_type == Enum_Register_Types::Unregister) {
-                            handler_entry_ptr->_active = false;
-                        }
-                        rcp_next.push_back(std::move(rc));
-                    }
-                }
-            }
-        }
-
-        // apply the next reactor commands returned from the current handlers in the map
-        void apply_reactor_commands(reactor_command_pack_t& rcp_next) {
-            // update the fd_sets and the handler maps.
-            for (auto& [fd, register_type, event_type, handler_command_type, handler__new] : rcp_next) {
-                if (register_type == Enum_Register_Types::Unregister) {
-                    fd_unregister(fd);
-                }
-                else if (register_type == Enum_Register_Types::Register) {
-                    fd_register(fd, event_type);
-                }
-                if (
-                    handler_command_type == Enum_Handler_Command_Types::Add ||
-                    handler_command_type == Enum_Handler_Command_Types::Replace)
-                {
-                    add_handler(fd, std::move(handler__new), event_type);
-                }
-            }
-        }
-
-        std::unordered_map<int, Handler_Entry> _handler_entrys;
-        std::vector<pollfd_x> _pollfds;
-        timeout_x _msec{ -1 };
-        std::atomic<bool> _running{ false };
-    };
-
-} // namespace BA_Socket
-
-#endif // EVENT_LOOP__POLL__ST_HPP
-
-
-// Event_Loop__Poll__MT.hpp
-// Multi-threaded poll event loop
-
-#ifndef EVENT_LOOP__POLL__MT_HPP
-#define EVENT_LOOP__POLL__MT_HPP
-
-#include <unordered_map>
-#include <vector>
-#include <atomic>
-#include <thread>
-#include <optional>
-#include "poll_setup.hpp"
-#include "IEvent_Loop.hpp"
-#include "Handler.hpp"
-
-namespace BA_Socket {
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    class Event_Loop__Poll__MT : public IEvent_Loop {
-    public:
-        Event_Loop__Poll__MT(
-            timeout_x msec = -1,
-            size_t thread_count = std::thread::hardware_concurrency())
-                : _msec(msec), _tp(thread_count == 0 ? 1 : thread_count) {}
-
-        inline void fd_register(int fd, Enum_Event_Types event_type) override {
-            if (event_type == Enum_Event_Types::None) return;
-
-            short events = 0;
-            if (event_type == Enum_Event_Types::Read) {
-                events |= POLL_X_IN;
-            } else if (event_type == Enum_Event_Types::Write) {
-                events |= POLL_X_OUT;
-            } else { // Read_Write
-                events |= POLL_X_IN | POLL_X_OUT;
-            }
-
-            // update or add pollfd
-            auto it = std::find_if(
-                _pollfds.begin(),
-                _pollfds.end(),
-                [fd](const auto& pollfd_){ return pollfd_.fd == fd; });
-            if (it != _pollfds.end()) {
-                it->events |= events;
-            } else {
-                pollfd_t pollfd_{};
-                pollfd_.fd = fd;
-                pollfd_.events = events;
-                pollfd_.revents = 0;
-                _pollfds.push_back(pollfd_);
-            }
-        }
-
-        inline void fd_unregister(int fd) override {
-            _pollfds.erase(
-                std::remove_if(
-                    _pollfds.begin(),
-                    _pollfds.end(),
-                    [fd](const pollfd_t& pollfd_){ return pollfd_.fd == fd; }),
-                _pollfds.end());
-            _handler_entrys.erase(fd);
-        }
-
-        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
-            if (!handler) return;
-            if (event_type == Enum_Event_Types::None) return;
-
-            auto& handler_entry = _handler_entrys[fd];
-            if (event_type == Enum_Event_Types::Read) {
-                handler_entry._handler__read = std::move(handler);
-            } else if (event_type == Enum_Event_Types::Write) {
-                handler_entry._handler__write = std::move(handler);
-            }
-        }
-
-        inline void run() override {
-            _running.store(true);
-
-            // main loop
-            while (_running.load()) {
-                if (_pollfds.empty()) break;
-
-                // perform poll operation
-                std::vector<pollfd_t> pollfds_copy = _pollfds;
-                int status = poll_x(
-                    pollfds_copy.data(),
-                    static_cast<nfds_x>(pollfds_copy.size()),
-                    _msec);
-                if (status < 0) {
-                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
-                    SOCKET_ERROR__POLL();
-                    break;
-                }
-                if (status == 0) continue; // timeout
-
-                // create jobs from the current handler entry map
-                create_jobs(pollfds_copy);
-
-                // submit the jobs via the thread pool - multiple threads
-                submit_jobs();
-
-                // apply the next reactor commands returned from the current handlers in the map - single thread
-                apply_reactor_commands();
-            }
-        };
-
-        inline void stop() noexcept override {
-            _running.store(false);
-        }
-
-    private:
-
-        // get the handler entry from the pollfd
-        inline Handler_Entry* get_handler_entry_ptr(const pollfd_t & pollfd_) {
-            if (pollfd_.revents == 0) return nullptr;
-            if (!IS_VALID_SOCKET(pollfd_.fd)) return nullptr;
-#if defined(_WIN32)
-            if (pollfd_.fd == 0 && !_kbhit()) return nullptr;
-#endif
-
-            auto it = _handler_entrys.find(pollfd_.fd);
-            if (it == _handler_entrys.end()) return nullptr;
-            auto& handler_entry = it->second;
-            if (!handler_entry._active) return nullptr;
-            return &handler_entry;
-        }
-
-        // create jobs from the current handler entry map
-        void create_jobs(
-            const std::vector<pollfd_t>& pollfds_copy)
-        {
-            for (const auto& pollfd_ : pollfds_copy) {
-                // get the handler entry from the pollfd
-                auto handler_entry_ptr = get_handler_entry_ptr(pollfd_);
-                if (!handler_entry_ptr) continue;
-
-                // add the new jobs into _jobs
-                if ((pollfd_.revents & POLL_X_IN) && handler_entry_ptr->_handler__read) {
-                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__read));
-                }
-                if ((pollfd_.revents & POLL_X_OUT) && handler_entry_ptr->_handler__write) {
-                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__write));
-                }
-            }
-        }
-
-        // submit the jobs via the thread pool - multiple threads
-        // notice that this function is executed in the main thread.
-        // hence, operations on _jobs are single-threaded and safe (especially _job_results.empty()).
-        void submit_jobs() {
-            while (!_jobs.empty()) {
-                auto job{ _jobs.pop() };
-                if (!job.has_value()) continue;
-
-                auto job_val = std::move(job.value());
-                _tp.submit(
-                    [job_val, this]()
-                    { execute_job<Concurrent_Queue_Type>(job_val, _job_results); });
-            }
-        }
-
-        // apply the next reactor commands returned from the current handlers in the map.
-        // notice that this function is executed in the main thread,
-        // and starts with a call to wait_all_jobs on the thread pool.
-        // hence, the operations on _job_results are single-threaded and safe (especially _job_results.empty()).
-        void apply_reactor_commands() {
-            // wait till all workers finish
-            _tp.wait_all_jobs();
-
-            // apply the reactor commands
-            while (!_job_results.empty()) {
-                auto job_result{ _job_results.pop() };
-                if (!job_result.has_value()) continue;
-
-                auto& [fd, register_type, event_type, handler_command_type, handler__new] = job_result.value();
-                if (register_type == Enum_Register_Types::Unregister) {
-                    fd_unregister(fd);
-                }
-                else if (register_type == Enum_Register_Types::Register) {
-                    fd_register(fd, event_type);
-                }
-                if (
-                    handler_command_type == Enum_Handler_Command_Types::Add ||
-                    handler_command_type == Enum_Handler_Command_Types::Replace)
-                {
-                    add_handler(fd, std::move(handler__new), event_type);
-                }
-            }
-        }
-
-        std::unordered_map<int, Handler_Entry> _handler_entrys;
-        std::vector<pollfd_t> _pollfds;
-        Concurrent_Queue_Type<Job> _jobs;
-        Concurrent_Queue_Type<job_result_t> _job_results;
-        Thread_Pool_Type _tp;
-        timeout_x _msec{ -1 };
-        std::atomic<bool> _running{ false };
-    };
-} // namespace BA_Socket
-
-#endif // EVENT_LOOP__POLL__MT_HPP
-
-
-// poll_setup.hpp
-
-#ifndef POLL_SETUP_HPP
-#define POLL_SETUP_HPP
-
-#include "socket_setup.hpp"
-
-#if defined(_WIN32)
-    #include <mstcpip.h>
-
-    using pollfd_x  = WSAPOLLFD;
-    using nfds_x    = ULONG;
-    using timeout_x = INT;
-
-    inline int poll_x(pollfd_x* fds, nfds_x nfds, timeout_x timeout) {
-        return ::WSAPoll(fds, nfds, timeout);
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: TCP_client__select__ST hostname port\n");
+        return 1;
     }
-
-    // Cross-platform event flag names (same as your current aliases)
-    static constexpr short POLL_X_IN   = POLLRDNORM;
-    static constexpr short POLL_X_OUT  = POLLWRNORM;
-    static constexpr short POLL_X_ERR  = POLLERR;
-    static constexpr short POLL_X_HUP  = POLLHUP;
-    static constexpr short POLL_X_NVAL = POLLNVAL;
-#else
-    #include <poll.h>
-
-    using pollfd_x  = struct pollfd;
-    using nfds_x    = nfds_t;
-    using timeout_x = int;
-
-    inline int poll_x(pollfd_x* fds, nfds_x nfds, timeout_x timeout) {
-        return ::poll(fds, nfds, timeout);
-    }
-
-    static constexpr short POLL_X_IN   = POLLIN;
-    static constexpr short POLL_X_OUT  = POLLOUT;
-    static constexpr short POLL_X_ERR  = POLLERR;
-    static constexpr short POLL_X_HUP  = POLLHUP;
-    static constexpr short POLL_X_NVAL = POLLNVAL;
-#endif // _WIN32
-
-#endif // POLL_SETUP_HPP
+    
+    std::string hostname = argv[1];
+    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
+    int status = TCP_client__select__ST(hostname, port, AF_INET6);
+    return status;
+}
 
 
+// TCP_server__select__MT.cpp
+
+#include "TCP_server__select__MT.hpp"
+#include "Concurrent_Queue__Blocking.hpp"
+#include "Thread_Pool__Blocking.hpp"
+
+using namespace BA_Socket;
+using namespace BA_Concurrency;
+
+int main() {
+    int status = TCP_server__select__MT<Concurrent_Queue__Blocking, Thread_Pool__Blocking>();
+    return status;
+}
+
+
+// TCP_server__select__ST.cpp
+
+#include "TCP_server__select__ST.hpp"
+using namespace BA_Socket;
+
+int main() {
+    int status = TCP_server__select__ST();
+    return status;
+}
+
+
+# ./src/CMakeLists.txt
+
+#file(GLOB SRC_FILES *.cpp)
+
+add_executable(TCP_server__select__ST TCP_server__select__ST.cpp)
+add_executable(TCP_server__select__MT TCP_server__select__MT.cpp)
+add_executable(TCP_client__select__ST TCP_client__select__ST.cpp)
+add_executable(TCP_client__select__MT TCP_client__select__MT.cpp)
+add_executable(TCP_server__poll__ST TCP_server__poll__ST.cpp)
+add_executable(TCP_server__poll__MT TCP_server__poll__MT.cpp)
+add_executable(TCP_client__poll__ST TCP_client__poll__ST.cpp)
+add_executable(TCP_client__poll__MT TCP_client__poll__MT.cpp)
+target_include_directories(TCP_server__select__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP_server__select__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP_client__select__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP_client__select__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP_server__poll__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP_server__poll__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP_client__poll__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP_client__poll__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+#set_target_properties(
+#  BA_Socket
+#  PROPERTIES
+#  ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
+#  LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
+#)
+#target_compile_options(BA_Socket PRIVATE -Wall -Wextra -Wpedantic)

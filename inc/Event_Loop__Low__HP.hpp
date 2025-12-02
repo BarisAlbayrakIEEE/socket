@@ -1,8 +1,12 @@
-// Event_Loop__Select__MT.hpp
-// Multi-threaded select event loop
+// Event_Loop__Low__HP.hpp :
+//   Platform                 : Cross-platform
+//   Performance              : Low (select-based configuration)
+//   Concurrency              :
+//     Event loop             : Single-threaded
+//     Handler execution      : Parallel
 
-#ifndef EVENT_LOOP__SELECT__MT_HPP
-#define EVENT_LOOP__SELECT__MT_HPP
+#ifndef EVENT_LOOP__LOW__HP_HPP
+#define EVENT_LOOP__LOW__HP_HPP
 
 #include <unordered_map>
 #include <mutex>
@@ -10,25 +14,21 @@
 #include <thread>
 #include <optional>
 #include "IEvent_Loop.hpp"
-#include "Handler.hpp"
+#include "Event_Handler.hpp"
 
 namespace BA_Socket {
-    template <template <typename> typename Concurrent_Queue_Type>
-    void execute_job(
-        const Job& job,
-        Concurrent_Queue_Type<job_result_t>& job_results)
-    {
-        auto rcp = std::move(job._handler->apply(job._fd));
-        for (auto& rc : rcp) {
-            job_results.push(std::move(rc));
-        }
-    };
-
     template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
         requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    class Event_Loop__Select__MT : public IEvent_Loop {
+    class Event_Loop<
+        Enum_Event_Loop_Types::Low,
+        Enum_Concurrency_Types::HP,
+        Thread_Pool_Type,
+        Job,
+        job_result_t>
+            : public IEvent_Loop
+    {
     public:
-        Event_Loop__Select__MT(
+        Event_Loop(
             time_t sec = 0,
             suseconds_t usec = 0,
             size_t thread_count = std::thread::hardware_concurrency())
@@ -38,16 +38,16 @@ namespace BA_Socket {
             FD_ZERO(&_fd_set__write);
         }
 
-        inline void fd_register(int fd, Enum_Event_Types event_type) override {
-            if (event_type == Enum_Event_Types::None) return;
+        inline void fd_register(int fd, Enum_IO_Event_Types event_type) override {
+            if (event_type == Enum_IO_Event_Types::None) return;
 
-            if (event_type == Enum_Event_Types::Read) {
+            if (event_type == Enum_IO_Event_Types::Read) {
                 FD_SET(fd, &_fd_set__read);
             }
-            else if (event_type == Enum_Event_Types::Write) {
+            else if (event_type == Enum_IO_Event_Types::Write) {
                 FD_SET(fd, &_fd_set__write);
             }
-            else { // if (event_type == Enum_Event_Types::Read_Write) {
+            else { // if (event_type == Enum_IO_Event_Types::Read_Write) {
                 FD_SET(fd, &_fd_set__read);
                 FD_SET(fd, &_fd_set__write);
             }
@@ -69,18 +69,18 @@ namespace BA_Socket {
                     }
                 }
             }
-            _handler_entrys.erase(fd);
+            _event_handler_entrys.erase(fd);
         }
 
-        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
+        inline void add_event_handler(int fd, event_handler_ptr_t&& handler, Enum_IO_Event_Types event_type) {
             if (!handler) return;
-            if (event_type == Enum_Event_Types::None) return;
+            if (event_type == Enum_IO_Event_Types::None) return;
 
-            auto& handler_entry = _handler_entrys[fd];
-            if (event_type == Enum_Event_Types::Read) {
-                handler_entry._handler__read = std::move(handler);
-            } else if (event_type == Enum_Event_Types::Write) {
-                handler_entry._handler__write = std::move(handler);
+            auto& event_handler_entry = _event_handler_entrys[fd];
+            if (event_type == Enum_IO_Event_Types::Read) {
+                event_handler_entry._event_handler__read = std::move(handler);
+            } else if (event_type == Enum_IO_Event_Types::Write) {
+                event_handler_entry._event_handler__write = std::move(handler);
             }
         }
 
@@ -109,7 +109,7 @@ namespace BA_Socket {
                 // perform select operation
                 if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, timeout_ptr) < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
-                    SOCKET_ERROR__SELECT();
+                    SOCKET_ERROR__LOW();
                     break;
                 }
 
@@ -119,8 +119,8 @@ namespace BA_Socket {
                 // submit the jobs via the thread pool - multiple threads
                 submit_jobs();
 
-                // apply the next reactor commands returned from the current handlers in the map - single thread
-                apply_reactor_commands();
+                // apply the reactor events - single thread
+                apply_reactor_events();
             }
         };
 
@@ -131,17 +131,17 @@ namespace BA_Socket {
     private:
 
         // get handler from the handler entry
-        inline IHandler* get_handler_ptr(
+        inline IEvent_Handler* get_event_handler_ptr(
             int fd,
             fd_set fd_set__read,
             fd_set fd_set__write,
-            Handler_Entry& handler_entry,
-            Enum_Event_Types event_type)
+            Event_Handler_Entry& event_handler_entry,
+            Enum_IO_Event_Types event_type)
         {
             if (!IS_VALID_SOCKET(fd)) return nullptr;
-            if (!handler_entry._active) return nullptr;
-            IHandler *handler_ptr{ nullptr };
-            if (event_type == Enum_Event_Types::Read) {
+            if (!event_handler_entry._active) return nullptr;
+            IEvent_Handler *event_handler_ptr{ nullptr };
+            if (event_type == Enum_IO_Event_Types::Read) {
 #if defined(_WIN32)
                 if (fd == 0) {
                     if (!_kbhit()) return nullptr;
@@ -151,36 +151,36 @@ namespace BA_Socket {
 #else
                 if (!FD_ISSET(fd, &fd_set__read)) return nullptr;
 #endif
-                handler_ptr = handler_entry._handler__read.get();
+                event_handler_ptr = event_handler_entry._event_handler__read.get();
             }
-            else if (event_type == Enum_Event_Types::Write) {
+            else if (event_type == Enum_IO_Event_Types::Write) {
                 if (!FD_ISSET(fd, &fd_set__write)) return nullptr;
-                handler_ptr = handler_entry._handler__write.get();
+                event_handler_ptr = event_handler_entry._event_handler__write.get();
             }
-            return handler_ptr;
+            return event_handler_ptr;
         }
 
         // create jobs from the current handler entry map
         inline void create_jobs(fd_set fd_set__read, fd_set fd_set__write) {
-            create_jobs_helper(fd_set__read, fd_set__write, Enum_Event_Types::Read);
-            create_jobs_helper(fd_set__read, fd_set__write, Enum_Event_Types::Write);
+            create_jobs_helper(fd_set__read, fd_set__write, Enum_IO_Event_Types::Read);
+            create_jobs_helper(fd_set__read, fd_set__write, Enum_IO_Event_Types::Write);
         }
 
         // create jobs from the current handler entry map - helper
         void create_jobs_helper(
             fd_set fd_set__read,
             fd_set fd_set__write,
-            Enum_Event_Types event_type)
+            Enum_IO_Event_Types event_type)
         {
-            for (auto& [fd, handler_entry] : _handler_entrys) {
-                auto handler_ptr = get_handler_ptr(
+            for (auto& [fd, event_handler_entry] : _event_handler_entrys) {
+                auto event_handler_ptr = get_event_handler_ptr(
                     fd,
                     fd_set__read,
                     fd_set__write,
-                    handler_entry,
+                    event_handler_entry,
                     event_type);
-                if (!handler_ptr) continue;
-                _jobs.push(Job(fd, handler_ptr));
+                if (!event_handler_ptr) continue;
+                _jobs.push(Job(fd, event_handler_ptr));
             }
         }
 
@@ -199,11 +199,11 @@ namespace BA_Socket {
             }
         }
 
-        // apply the next reactor commands returned from the current handlers in the map.
+        // apply the reactor events.
         // notice that this function is executed in the main thread,
         // and starts with a call to wait_all_jobs on the thread pool.
         // hence, the operations on _job_results are single-threaded and safe (especially _job_results.empty()).
-        void apply_reactor_commands() {
+        void apply_reactor_events() {
             // wait till all workers finish
             _tp.wait_all_jobs();
 
@@ -223,12 +223,12 @@ namespace BA_Socket {
                     handler_command_type == Enum_Handler_Command_Types::Add ||
                     handler_command_type == Enum_Handler_Command_Types::Replace)
                 {
-                    add_handler(fd, std::move(handler__new), event_type);
+                    add_event_handler(fd, std::move(handler__new), event_type);
                 }
             }
         }
 
-        std::unordered_map<int, Handler_Entry> _handler_entrys;
+        std::unordered_map<int, Event_Handler_Entry> _event_handler_entrys;
         Concurrent_Queue_Type<Job> _jobs;
         Concurrent_Queue_Type<job_result_t> _job_results;
         Thread_Pool_Type _tp;
@@ -239,6 +239,15 @@ namespace BA_Socket {
         int _fd_max = -1;
         std::atomic<bool> _running{false};
     };
+
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    using Event_Loop__Low__HP = Event_Loop<
+        Enum_Event_Loop_Types::Low,
+        Enum_Concurrency_Types::HP,
+        Thread_Pool_Type,
+        Job,
+        job_result_t>;
 } // namespace BA_Socket
 
-#endif // EVENT_LOOP__SELECT__MT_HPP
+#endif // EVENT_LOOP__LOW__HP_HPP

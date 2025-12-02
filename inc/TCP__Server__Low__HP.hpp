@@ -1,25 +1,21 @@
-// TCP_server__select__MT.hpp
+// TCP__Server__Low__HP.hpp
 
-#ifndef TCP_SERVER__SELECT__MT_HPP
-#define TCP_SERVER__SELECT__MT_HPP
+#ifndef TCP__SERVER__LOW__HP_HPP
+#define TCP__SERVER__LOW__HP_HPP
 
 #include "Socket.hpp"
-#include "Event_Loop__Select__MT.hpp"
+#include "Event_Loop__Low__HP.hpp"
+#include "aux_functions.hpp"
 #include <ctype.h>
 #include <algorithm>
 
 using namespace BA_Concurrency;
 
 namespace BA_Socket {
-    inline bool to_up(std::string& str) {
-        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
-        return true;
-    }
-
     template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
         requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    int TCP_server__select__MT_helper() {
-        using EL_t = Event_Loop__Select__MT<
+    int TCP__Server__Low__HP_helper() {
+        using EL_t = Event_Loop__Low__HP<
             Concurrent_Queue_Type,
             Thread_Pool_Type>;
 
@@ -35,17 +31,17 @@ namespace BA_Socket {
 
         // create the event looop
         EL_t el{};
-        el.fd_register(fd_listen, Enum_Event_Types::Read);
+        el.fd_register(fd_listen, Enum_IO_Event_Types::Read);
 #ifdef SEPARATE_READ_WRITE
-        el.add_handler(
+        el.add_event_handler(
             fd_listen,
             std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(&to_up),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
 #else
-        el.add_handler(
+        el.add_event_handler(
             fd_listen,
             std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(&to_up),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
 #endif
         el.run();
 
@@ -54,12 +50,12 @@ namespace BA_Socket {
     
     template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
         requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    inline int TCP_server__select__MT() {
+    inline int TCP__Server__Low__HP() {
         SOCKET_STARTUP();
-        int status = TCP_server__select__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>();
+        int status = TCP__Server__Low__HP_helper<Concurrent_Queue_Type, Thread_Pool_Type>();
         SOCKET_CLEANUP();
         return status;
     }
 } // namespace BA_Socket
 
-#endif // TCP_SERVER__SELECT__MT_HPP
+#endif // TCP__SERVER__LOW__HP_HPP

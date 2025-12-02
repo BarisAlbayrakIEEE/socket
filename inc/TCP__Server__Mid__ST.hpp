@@ -1,20 +1,16 @@
-// TCP_server__poll__ST.hpp
+// TCP__Server__Mid__ST.hpp
 
-#ifndef TCP_SERVER__POLL__ST_HPP
-#define TCP_SERVER__POLL__ST_HPP
+#ifndef TCP__SERVER__MID__ST_HPP
+#define TCP__SERVER__MID__ST_HPP
 
 #include "Socket.hpp"
-#include "Event_Loop__Poll__ST.hpp"
+#include "Event_Loop__Mid__ST.hpp"
+#include "aux_functions.hpp"
 #include <ctype.h>
 #include <algorithm>
 
 namespace BA_Socket {
-    inline bool to_up(std::string& str) {
-        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
-        return true;
-    }
-
-    int TCP_server__poll__ST_helper() {
+    int TCP__Server__Mid__ST_helper() {
         // create the server socket and bind to the local address
         PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
         Socket socket_listen = create_socket_bind_to_local_addr("all");
@@ -26,30 +22,30 @@ namespace BA_Socket {
         if (!socket_listen.listen(10)) return 1;
 
         // create the event looop
-        Event_Loop__Poll__ST el{};
-        el.fd_register(fd_listen, Enum_Event_Types::Read);
+        Event_Loop__Mid__ST el{};
+        el.fd_register(fd_listen, Enum_IO_Event_Types::Read);
 #ifdef SEPARATE_READ_WRITE
-        el.add_handler(
+        el.add_event_handler(
             fd_listen,
             std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(&to_up),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
 #else
-        el.add_handler(
+        el.add_event_handler(
             fd_listen,
             std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(&to_up),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
 #endif
         el.run();
 
         return 0;
     }
     
-    inline int TCP_server__poll__ST() {
+    inline int TCP__Server__Mid__ST() {
         SOCKET_STARTUP();
-        int status = TCP_server__poll__ST_helper();
+        int status = TCP__Server__Mid__ST_helper();
         SOCKET_CLEANUP();
         return status;
     }
 } // namespace BA_Socket
 
-#endif // TCP_SERVER__POLL__ST_HPP
+#endif // TCP__SERVER__MID__ST_HPP

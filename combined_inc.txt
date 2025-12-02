@@ -18,30 +18,15 @@ namespace BA_Socket {
         const Job& job,
         Concurrent_Queue_Type<job_result_t>& job_results)
     {
-        auto reactor_command_pack = std::move(job._handler->apply(job._fd));
-        for (auto& reactor_command : reactor_command_pack) {
-            job_results.push(std::move(reactor_command));
+        auto rcp = std::move(job._handler->apply(job._fd));
+        for (auto& rc : rcp) {
+            job_results.push(std::move(rc));
         }
     };
 
     template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
         requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
     class Event_Loop__Select__MT : public IEvent_Loop {
-        struct Handler_Entry {
-            handler_ptr_t _handler__read{ nullptr };
-            handler_ptr_t _handler__write{ nullptr };
-            bool _active{ true };
-
-            Handler_Entry(
-                handler_ptr_t handler__read = nullptr,
-                handler_ptr_t handler__write = nullptr,
-                bool active = true)
-                :
-                _handler__read(std::move(handler__read)),
-                _handler__write(std::move(handler__write)),
-                _active(active) {}                
-        };
-
     public:
         Event_Loop__Select__MT(
             time_t sec = 0,
@@ -84,25 +69,18 @@ namespace BA_Socket {
                     }
                 }
             }
-        }
-
-        inline void add_stdin_to_reads() {
-            FD_SET(0, &_fd_set__read);
-        }
-
-        inline void add_stdout_to_writes() {
-            FD_SET(1, &_fd_set__write);
+            _handler_entrys.erase(fd);
         }
 
         inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
             if (!handler) return;
             if (event_type == Enum_Event_Types::None) return;
 
+            auto& handler_entry = _handler_entrys[fd];
             if (event_type == Enum_Event_Types::Read) {
-                _handler_entrys[fd]._handler__read = std::move(handler);
-            }
-            else if (event_type == Enum_Event_Types::Write) {
-                _handler_entrys[fd]._handler__write = std::move(handler);
+                handler_entry._handler__read = std::move(handler);
+            } else if (event_type == Enum_Event_Types::Write) {
+                handler_entry._handler__write = std::move(handler);
             }
         }
 
@@ -113,7 +91,7 @@ namespace BA_Socket {
             while (_running.load()) {
                 if (_fd_max < 0) break;
 
-                // perform select operation
+                // copy fd_sets
                 fd_set fd_set__read = _fd_set__read;
                 fd_set fd_set__write = _fd_set__write;
 
@@ -127,95 +105,24 @@ namespace BA_Socket {
                     timeout.tv_usec = _usec;
                     timeout_ptr     = &timeout;
                 }
+
+                // perform select operation
                 if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, timeout_ptr) < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
                     SOCKET_ERROR__SELECT();
                     break;
                 }
 
-                // execute _handler_entrys - read
-                for (auto& [fd, handler_entry] : _handler_entrys) {
-                    // inspect the fd, the handler entry and the handler
-                    auto handler_ptr = get_handler_ptr(
-                        fd,
-                        fd_set__read,
-                        fd_set__write,
-                        handler_entry,
-                        Enum_Event_Types::Write);
-                    if (!handler_ptr) continue;
-
-                    // push the job into the job queue
-                    _jobs.push(Job(fd, handler_ptr));
-                }
-
-                // execute _handler_entrys - write
-                for (auto& [fd, handler_entry] : _handler_entrys) {
-                    // inspect the fd, the handler entry and the handler
-                    auto handler_ptr = get_handler_ptr(
-                        fd,
-                        fd_set__read,
-                        fd_set__write,
-                        handler_entry,
-                        Enum_Event_Types::Read);
-                    if (!handler_ptr) continue;
-
-                    // push the job into the job queue
-                    _jobs.push(Job(fd, handler_ptr));
-                }
+                // create jobs from the current handler entry map
+                create_jobs(fd_set__read, fd_set__write);
 
                 // submit the jobs via the thread pool - multiple threads
                 submit_jobs();
 
-                // update the fd_sets and handler map
-                // by applying the reactor commands returned from the threads - single thread
+                // apply the next reactor commands returned from the current handlers in the map - single thread
                 apply_reactor_commands();
             }
         };
-
-        // submit the jobs via the thread pool - multiple threads
-        void submit_jobs() {
-            // notice that this function is executed in the main thread.
-            // hence, the operations on _jobs are single threaded and safe (especially _jobs.empty()).
-            while (!_jobs.empty()) {
-                auto job{ _jobs.pop() };
-                if (!job.has_value()) continue;
-
-                auto job_val = std::move(job.value());
-                _tp.submit(
-                    [job_val, this]()
-                    { execute_job<Concurrent_Queue_Type>(job_val, _job_results); });
-            }
-        }
-
-        // update the fd_sets and handler map
-        // by applying the reactor commands returned from the threads - single thread
-        void apply_reactor_commands() {
-            // wait till all workers finish
-            _tp.wait_all_jobs();
-
-            // apply the reactor commands
-            // notice that this function is executed in the main thread.
-            // hence, the operations on _job_results are single threaded and safe (especially _job_results.empty()).
-            while (!_job_results.empty()) {
-                auto job_result{ _job_results.pop() };
-                if (!job_result.has_value()) continue;
-
-                auto& [fd, register_type, event_type, handler_command_type, handler__new] = job_result.value();
-                if (register_type == Enum_Register_Types::Unregister) {
-                    fd_unregister(fd);
-                    _handler_entrys.erase(fd);
-                }
-                else if (register_type == Enum_Register_Types::Register) {
-                    fd_register(fd, event_type);
-                }
-                if (
-                    handler_command_type == Enum_Handler_Command_Types::Add ||
-                    handler_command_type == Enum_Handler_Command_Types::Replace)
-                {
-                    add_handler(fd, std::move(handler__new), event_type);
-                }
-            }
-        }
 
         inline void stop() noexcept override {
             _running.store(false);
@@ -223,17 +130,16 @@ namespace BA_Socket {
 
     private:
 
-        // inspect the fd, the handler entry and the handler
-        IHandler* get_handler_ptr(
+        // get handler from the handler entry
+        inline IHandler* get_handler_ptr(
             int fd,
             fd_set fd_set__read,
             fd_set fd_set__write,
             Handler_Entry& handler_entry,
             Enum_Event_Types event_type)
         {
-            if (!handler_entry._active) return nullptr;
             if (!IS_VALID_SOCKET(fd)) return nullptr;
-
+            if (!handler_entry._active) return nullptr;
             IHandler *handler_ptr{ nullptr };
             if (event_type == Enum_Event_Types::Read) {
 #if defined(_WIN32)
@@ -252,6 +158,74 @@ namespace BA_Socket {
                 handler_ptr = handler_entry._handler__write.get();
             }
             return handler_ptr;
+        }
+
+        // create jobs from the current handler entry map
+        inline void create_jobs(fd_set fd_set__read, fd_set fd_set__write) {
+            create_jobs_helper(fd_set__read, fd_set__write, Enum_Event_Types::Read);
+            create_jobs_helper(fd_set__read, fd_set__write, Enum_Event_Types::Write);
+        }
+
+        // create jobs from the current handler entry map - helper
+        void create_jobs_helper(
+            fd_set fd_set__read,
+            fd_set fd_set__write,
+            Enum_Event_Types event_type)
+        {
+            for (auto& [fd, handler_entry] : _handler_entrys) {
+                auto handler_ptr = get_handler_ptr(
+                    fd,
+                    fd_set__read,
+                    fd_set__write,
+                    handler_entry,
+                    event_type);
+                if (!handler_ptr) continue;
+                _jobs.push(Job(fd, handler_ptr));
+            }
+        }
+
+        // submit the jobs via the thread pool - multiple threads
+        // notice that this function is executed in the main thread.
+        // hence, operations on _jobs are single-threaded and safe (especially _job_results.empty()).
+        void submit_jobs() {
+            while (!_jobs.empty()) {
+                auto job{ _jobs.pop() };
+                if (!job.has_value()) continue;
+
+                auto job_val = std::move(job.value());
+                _tp.submit(
+                    [job_val, this]()
+                    { execute_job<Concurrent_Queue_Type>(job_val, _job_results); });
+            }
+        }
+
+        // apply the next reactor commands returned from the current handlers in the map.
+        // notice that this function is executed in the main thread,
+        // and starts with a call to wait_all_jobs on the thread pool.
+        // hence, the operations on _job_results are single-threaded and safe (especially _job_results.empty()).
+        void apply_reactor_commands() {
+            // wait till all workers finish
+            _tp.wait_all_jobs();
+
+            // apply the reactor commands
+            while (!_job_results.empty()) {
+                auto job_result{ _job_results.pop() };
+                if (!job_result.has_value()) continue;
+
+                auto& [fd, register_type, event_type, handler_command_type, handler__new] = job_result.value();
+                if (register_type == Enum_Register_Types::Unregister) {
+                    fd_unregister(fd);
+                }
+                else if (register_type == Enum_Register_Types::Register) {
+                    fd_register(fd, event_type);
+                }
+                if (
+                    handler_command_type == Enum_Handler_Command_Types::Add ||
+                    handler_command_type == Enum_Handler_Command_Types::Replace)
+                {
+                    add_handler(fd, std::move(handler__new), event_type);
+                }
+            }
         }
 
         std::unordered_map<int, Handler_Entry> _handler_entrys;
@@ -316,6 +290,9 @@ namespace BA_Socket {
 
     #define ERROR_INTERRUPTED  (WSAEINTR)
     #define ERROR_BLOCKED      (WSAEWOULDBLOCK)
+
+    #define SOCKET_ERROR__POLL() \
+        fprintf(stderr, "[WSAPoll() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -337,6 +314,9 @@ namespace BA_Socket {
 
     #define ERROR_INTERRUPTED  (EINTR)
     #define ERROR_BLOCKED      (EAGAIN)
+
+    #define SOCKET_ERROR__POLL() \
+        fprintf(stderr, "[poll() error] %s: (errno=%d)\n", strerror(GET_SOCKET_ERRNO()), GET_SOCKET_ERRNO())
 #endif
 #if !defined(IPV6_V6ONLY)
     #define IPV6_V6ONLY 27
@@ -471,6 +451,7 @@ namespace BA_Socket {
 #ifndef TCP_SERVER__SELECT__MT_HPP
 #define TCP_SERVER__SELECT__MT_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__MT.hpp"
 #include <ctype.h>
 #include <algorithm>
@@ -537,6 +518,7 @@ namespace BA_Socket {
 #ifndef TCP_CLIENT__SELECT__MT_HPP
 #define TCP_CLIENT__SELECT__MT_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__MT.hpp"
 #include <ctype.h>
 
@@ -592,8 +574,8 @@ namespace BA_Socket {
         PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // create the event looop
-        EL_t el{ 0, 100000 };
-        el.add_stdin_to_reads();
+        EL_t el{ 0, 100000, std::thread::hardware_concurrency() };
+        el.fd_register(0, Enum_Event_Types::Read);
         el.add_handler(
             0,
             std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
@@ -631,6 +613,7 @@ namespace BA_Socket {
 #ifndef TCP_SERVER__SELECT__ST_HPP
 #define TCP_SERVER__SELECT__ST_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__ST.hpp"
 #include <ctype.h>
 #include <algorithm>
@@ -680,6 +663,63 @@ namespace BA_Socket {
 } // namespace BA_Socket
 
 #endif // TCP_SERVER__SELECT__ST_HPP
+
+
+// TCP_server__poll__ST.hpp
+
+#ifndef TCP_SERVER__POLL__ST_HPP
+#define TCP_SERVER__POLL__ST_HPP
+
+#include "Socket.hpp"
+#include "Event_Loop__Poll__ST.hpp"
+#include <ctype.h>
+#include <algorithm>
+
+namespace BA_Socket {
+    inline bool to_up(std::string& str) {
+        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+        return true;
+    }
+
+    int TCP_server__poll__ST_helper() {
+        // create the server socket and bind to the local address
+        PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
+        Socket socket_listen = create_socket_bind_to_local_addr("all");
+        if (!socket_listen.is_valid()) return 1;
+        SOCKET fd_listen = socket_listen.native_handle();
+
+        // listen for connections
+        PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
+        if (!socket_listen.listen(10)) return 1;
+
+        // create the event looop
+        Event_Loop__Poll__ST el{};
+        el.fd_register(fd_listen, Enum_Event_Types::Read);
+#ifdef SEPARATE_READ_WRITE
+        el.add_handler(
+            fd_listen,
+            std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(&to_up),
+            Enum_Event_Types::Read);
+#else
+        el.add_handler(
+            fd_listen,
+            std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(&to_up),
+            Enum_Event_Types::Read);
+#endif
+        el.run();
+
+        return 0;
+    }
+    
+    inline int TCP_server__poll__ST() {
+        SOCKET_STARTUP();
+        int status = TCP_server__poll__ST_helper();
+        SOCKET_CLEANUP();
+        return status;
+    }
+} // namespace BA_Socket
+
+#endif // TCP_SERVER__POLL__ST_HPP
 
 
 // TCP_client.hpp
@@ -832,11 +872,9 @@ namespace BA_Socket {
 #ifndef SOCKET_HPP
 #define SOCKET_HPP
 
-#include "utility_addr.hpp"
 #include <stdexcept>
 #include <utility>
-#include <cstring>
-#include <stdio.h>
+#include "utility_addr.hpp"
 
 namespace BA_Socket {
     class Socket {
@@ -1114,21 +1152,6 @@ namespace BA_Socket {
 
 namespace BA_Socket {
     class Event_Loop__Select__ST : public IEvent_Loop {
-        struct Handler_Entry {
-            handler_ptr_t _handler__read{ nullptr };
-            handler_ptr_t _handler__write{ nullptr };
-            bool _active{ true };
-
-            Handler_Entry(
-                handler_ptr_t handler__read = nullptr,
-                handler_ptr_t handler__write = nullptr,
-                bool active = true)
-                :
-                _handler__read(std::move(handler__read)),
-                _handler__write(std::move(handler__write)),
-                _active(active) {}                
-        };
-
     public:
         Event_Loop__Select__ST(time_t sec = 0, suseconds_t usec = 0)
             : _sec(sec), _usec(usec)
@@ -1168,25 +1191,18 @@ namespace BA_Socket {
                     }
                 }
             }
-        }
-
-        inline void add_stdin_to_reads() {
-            FD_SET(0, &_fd_set__read);
-        }
-
-        inline void add_stdout_to_writes() {
-            FD_SET(1, &_fd_set__write);
+            _handler_entrys.erase(fd);
         }
 
         inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
             if (!handler) return;
             if (event_type == Enum_Event_Types::None) return;
 
+            auto& handler_entry = _handler_entrys[fd];
             if (event_type == Enum_Event_Types::Read) {
-                _handler_entrys[fd]._handler__read = std::move(handler);
-            }
-            else if (event_type == Enum_Event_Types::Write) {
-                _handler_entrys[fd]._handler__write = std::move(handler);
+                handler_entry._handler__read = std::move(handler);
+            } else if (event_type == Enum_Event_Types::Write) {
+                handler_entry._handler__write = std::move(handler);
             }
         }
 
@@ -1211,75 +1227,20 @@ namespace BA_Socket {
                     timeout.tv_usec = _usec;
                     timeout_ptr     = &timeout;
                 }
+
+                // perform select operation
                 if (::select(_fd_max + 1, &fd_set__read, &fd_set__write, nullptr, timeout_ptr) < 0) {
                     if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
                     SOCKET_ERROR__SELECT();
                     break;
                 }
 
-                // execute _handler_entrys - read
-                reactor_command_pack_t reactor_commands;
-                for (auto& [fd, handler_entry] : _handler_entrys) {
-                    // inspect the fd, the handler entry and the handler
-                    if (!handler_entry._active) continue;
-                    if (!IS_VALID_SOCKET(fd)) continue;
-#if defined(_WIN32)
-                    if (fd == 0) {
-                        if (!_kbhit()) continue;
-                    } else {
-                        if (!FD_ISSET(fd, &fd_set__read)) continue;
-                    }
-#else
-                    if (!FD_ISSET(fd, &fd_set__read)) continue;
-#endif
-                    auto handler_ptr = handler_entry._handler__read.get();
-                    if (!handler_ptr) continue;
+                // execute the handlers in the handler entry map
+                reactor_command_pack_t rcp_next;
+                execute_handlers(rcp_next, fd_set__read, fd_set__write);
 
-                    // execute the handler
-                    auto reactor_command_pack = handler_ptr->apply(fd);
-                    for (auto& reactor_command : reactor_command_pack) {
-                        if (reactor_command._register_type == Enum_Register_Types::Unregister) {
-                            handler_entry._active = false;
-                        }
-                        reactor_commands.push_back(std::move(reactor_command));
-                    }
-                }
-
-                // execute _handler_entrys - write
-                for (auto& [fd, handler_entry] : _handler_entrys) {
-                    // inspect the fd, the handler entry and the handler
-                    if (!handler_entry._active) continue;
-                    if (!IS_VALID_SOCKET(fd)) continue;
-                    if (!FD_ISSET(fd, &fd_set__write)) continue;
-                    auto handler_ptr = handler_entry._handler__write.get();
-                    if (!handler_ptr) continue;
-
-                    // execute the handler
-                    auto reactor_command_pack = handler_ptr->apply(fd);
-                    for (auto& reactor_command : reactor_command_pack) {
-                        if (reactor_command._register_type == Enum_Register_Types::Unregister) {
-                            handler_entry._active = false;
-                        }
-                        reactor_commands.push_back(std::move(reactor_command));
-                    }
-                }
-
-                // update the fd_sets and the handler maps.
-                for (auto& [fd, register_type, event_type, handler_command_type, handler__new] : reactor_commands) {
-                    if (register_type == Enum_Register_Types::Unregister) {
-                        fd_unregister(fd);
-                        _handler_entrys.erase(fd);
-                    }
-                    else if (register_type == Enum_Register_Types::Register) {
-                        fd_register(fd, event_type);
-                    }
-                    if (
-                        handler_command_type == Enum_Handler_Command_Types::Add ||
-                        handler_command_type == Enum_Handler_Command_Types::Replace)
-                    {
-                        add_handler(fd, std::move(handler__new), event_type);
-                    }
-                }
+                // apply the next reactor commands returned from the current handlers in the map
+                apply_reactor_commands(rcp_next);
             }
         }
 
@@ -1288,6 +1249,95 @@ namespace BA_Socket {
         }
 
     private:
+
+        // get handler from the handler entry
+        inline IHandler* get_handler_ptr(
+            int fd,
+            fd_set fd_set__read,
+            fd_set fd_set__write,
+            Handler_Entry& handler_entry,
+            Enum_Event_Types event_type)
+        {
+            if (!IS_VALID_SOCKET(fd)) return nullptr;
+            if (!handler_entry._active) return nullptr;
+            IHandler *handler_ptr{ nullptr };
+            if (event_type == Enum_Event_Types::Read) {
+#if defined(_WIN32)
+                if (fd == 0) {
+                    if (!_kbhit()) return nullptr;
+                } else {
+                    if (!FD_ISSET(fd, &fd_set__read)) return nullptr;
+                }
+#else
+                if (!FD_ISSET(fd, &fd_set__read)) return nullptr;
+#endif
+                handler_ptr = handler_entry._handler__read.get();
+            }
+            else if (event_type == Enum_Event_Types::Write) {
+                if (!FD_ISSET(fd, &fd_set__write)) return nullptr;
+                handler_ptr = handler_entry._handler__write.get();
+            }
+            return handler_ptr;
+        }
+
+        // execute the handlers in the handler entry map
+        inline void execute_handlers(
+            reactor_command_pack_t& rcp_next,
+            fd_set fd_set__read,
+            fd_set fd_set__write)
+        {
+            execute_handlers_helper(rcp_next, fd_set__read, fd_set__write, Enum_Event_Types::Read);
+            execute_handlers_helper(rcp_next, fd_set__read, fd_set__write, Enum_Event_Types::Write);
+        }
+
+        // execute the handlers in the handler entry map - helper
+        void execute_handlers_helper(
+            reactor_command_pack_t& rcp_next,
+            fd_set fd_set__read,
+            fd_set fd_set__write,
+            Enum_Event_Types event_type)
+        {
+            for (auto& [fd, handler_entry] : _handler_entrys) {
+                // get the handler
+                auto handler_ptr = get_handler_ptr(
+                    fd,
+                    fd_set__read,
+                    fd_set__write,
+                    handler_entry,
+                    event_type);
+                if (!handler_ptr) continue;
+
+                // execute the handler
+                auto rcp = handler_ptr->apply(fd);
+                for (auto& rc : rcp) {
+                    if (rc._register_type == Enum_Register_Types::Unregister) {
+                        handler_entry._active = false;
+                    }
+                    rcp_next.push_back(std::move(rc));
+                }
+            }
+        }
+
+        // update the fd_sets and handler map
+        // by applying the reactor commands returned from the threads
+        void apply_reactor_commands(reactor_command_pack_t& rcp_next) {
+            // update the fd_sets and the handler maps.
+            for (auto& [fd, register_type, event_type, handler_command_type, handler__new] : rcp_next) {
+                if (register_type == Enum_Register_Types::Unregister) {
+                    fd_unregister(fd);
+                }
+                else if (register_type == Enum_Register_Types::Register) {
+                    fd_register(fd, event_type);
+                }
+                if (
+                    handler_command_type == Enum_Handler_Command_Types::Add ||
+                    handler_command_type == Enum_Handler_Command_Types::Replace)
+                {
+                    add_handler(fd, std::move(handler__new), event_type);
+                }
+            }
+        }
+
         std::unordered_map<int, Handler_Entry> _handler_entrys;
         fd_set _fd_set__read;
         fd_set _fd_set__write;
@@ -1308,7 +1358,7 @@ namespace BA_Socket {
 
 #include <functional>
 #include <utility>
-#include "Socket.hpp"
+#include "utility_addr.hpp"
 #include "IHandler.hpp"
 
 namespace BA_Socket {
@@ -1316,8 +1366,7 @@ namespace BA_Socket {
     inline bool read_helper(int fd, std::string& buffer) {
         buffer.resize(READ_LEN);
         if (fd == 0) {
-            // receive data from stdin
-            PRINTF1("[Handler]: Reading user input...\n");
+            PRINTF1("[Handler]: Reading from the stdin...\n");
             if (!std::fgets(buffer.data(), READ_LEN, stdin)) {
                 PRINTF1("[Handler]: EOF for stdin.\n");
                 return false;
@@ -1351,55 +1400,79 @@ namespace BA_Socket {
         const std::string& buffer,
         reactor_command_pack_t& rcp)
     {
-        int bytes_sent = ::send(fd, buffer.c_str(), buffer.size(), 0);
-        if (bytes_sent == static_cast<int>(buffer.size())) {
-            PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
-            return;
-        }
+        if (fd == 1) {
+            printf(buffer.c_str());
+        } else if (fd == 2) {
+            fprintf(stderr, buffer.c_str());
+        } else {
+            int bytes_sent = ::send(fd, buffer.c_str(), buffer.size(), 0);
+            if (bytes_sent == static_cast<int>(buffer.size())) {
+                PRINTF4("[Handler]: Sent (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
+                return;
+            }
 
-        // partial send: schedule write handler to continue later
-        if (bytes_sent > 0) {
-            std::string remaining = buffer.substr(bytes_sent);
-            rcp.emplace_back(
-                fd,
-                Enum_Register_Types::Register,
-                Enum_Event_Types::Write,
-                Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Write>(std::move(remaining)));
-        }
+            // partial send: schedule write handler to continue later
+            if (bytes_sent > 0) {
+                std::string remaining = buffer.substr(bytes_sent);
+                rcp.emplace_back(
+                    fd,
+                    Enum_Register_Types::Register,
+                    Enum_Event_Types::Write,
+                    Enum_Handler_Command_Types::Add,
+                    std::make_unique<Handler_Write>(std::move(remaining)));
+                return;
+            }
 
-        // check status unless hard disconnection: retry later
-        auto status = GET_SOCKET_ERRNO();
-#if defined(_WIN32)
-        if (status == WSAEWOULDBLOCK) {
-            rcp.emplace_back(
-                fd,
-                Enum_Register_Types::Register,
-                Enum_Event_Types::Write,
-                Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Write>(buffer));
-            return;
-        }
-#else
-        if (status == EAGAIN || status == EWOULDBLOCK) {
-            rcp.emplace_back(
-                fd,
-                Enum_Register_Types::Register,
-                Enum_Event_Types::Write,
-                Enum_Handler_Command_Types::Add,
-                std::make_unique<Handler_Write>(buffer));
-            return;
-        }
+            // Hard disconnection
+            if (bytes_sent == 0) {
+                PRINTF1("[Handler]: Peer closed the connection.\n");
+                CLOSE_SOCKET(fd);
+                rcp.emplace_back(
+                    fd,
+                    Enum_Register_Types::Unregister,
+                    Enum_Event_Types::Read_Write,
+                    Enum_Handler_Command_Types::Remove,
+                    nullptr);
+                return;
+            }
+
+            // get errno
+            auto status = GET_SOCKET_ERRNO();
+
+            // transient errors: retry later
+            if (status == ERROR_INTERRUPTED || status == ERROR_BLOCKED) {
+                rcp.emplace_back(
+                    fd,
+                    Enum_Register_Types::Register,
+                    Enum_Event_Types::Write,
+                    Enum_Handler_Command_Types::Add,
+                    std::make_unique<Handler_Write>(buffer));
+                return;
+            }
+
+            // deal with separate EWOULDBLOCK
+#if !defined(_WIN32)
+            if (status == EWOULDBLOCK) {
+                rcp.emplace_back(
+                    fd,
+                    Enum_Register_Types::Register,
+                    Enum_Event_Types::Write,
+                    Enum_Handler_Command_Types::Add,
+                    std::make_unique<Handler_Write>(buffer));
+                return;
+            }
 #endif
-        // Hard disconnection
-        PRINTF1("[Handler]: Target peer disconnected.\n");
-        CLOSE_SOCKET(fd);
-        rcp.emplace_back(
-            fd,
-            Enum_Register_Types::Unregister,
-            Enum_Event_Types::Read_Write,
-            Enum_Handler_Command_Types::Remove,
-            nullptr);
+
+            // unhandled send failure
+            PRINTF1("[Handler]: Unhandled send failure.\n");
+            CLOSE_SOCKET(fd);
+            rcp.emplace_back(
+                fd,
+                Enum_Register_Types::Unregister,
+                Enum_Event_Types::Read_Write,
+                Enum_Handler_Command_Types::Remove,
+                nullptr);
+        }
     }
 
     // Write handler
@@ -1420,11 +1493,14 @@ namespace BA_Socket {
         reactor_command_pack_t apply(int fd) const override {
             // send the data to the peer
             PRINTF1("[Handler]: Sending the data to the peer...\n");
-            ::send(fd, _buffer.c_str(), _buffer.size(), 0);
-            PRINTF4("[Handler]: Sent (%d bytes): %.*s", _buffer.size(), _buffer.size(), _buffer.c_str());
+            reactor_command_pack_t rcp{};
+            write_helper(fd, _buffer, rcp);
 
             // return the handler pack
-            HANDLER_RETURN_PACK__NONE();
+            if (rcp.empty()) {
+                HANDLER_RETURN_PACK__NONE();
+            }
+            return rcp;
         };
     };
     
@@ -2064,6 +2140,7 @@ namespace BA_Socket {
 #ifndef TCP_CLIENT__SELECT__ST_HPP
 #define TCP_CLIENT__SELECT__ST_HPP
 
+#include "Socket.hpp"
 #include "Event_Loop__Select__ST.hpp"
 #include <ctype.h>
 
@@ -2112,7 +2189,7 @@ namespace BA_Socket {
 
         // create the event looop
         Event_Loop__Select__ST el{ 0, 100000 };
-        el.add_stdin_to_reads();
+        el.fd_register(0, Enum_Event_Types::Read);
         el.add_handler(
             0,
             std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
@@ -2127,7 +2204,7 @@ namespace BA_Socket {
 
         return 0;
     }
-    
+
     inline int TCP_client__select__ST(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
@@ -2143,17 +2220,177 @@ namespace BA_Socket {
 #endif // TCP_CLIENT__SELECT__ST_HPP
 
 
+// TCP_client__poll__MT.hpp
+
+#ifndef TCP_CLIENT__POLL__MT_HPP
+#define TCP_CLIENT__POLL__MT_HPP
+
+#include "Socket.hpp"
+#include "Event_Loop__Poll__MT.hpp"
+#include <ctype.h>
+
+using namespace BA_Concurrency;
+
+namespace BA_Socket {
+    inline bool write_to_stdout(const std::string& buffer) {
+        printf("[Client]: Received (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
+        return true;
+    }
+
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    int TCP_client__poll__MT_helper(
+        const std::string& hostname = "localhost",
+        uint16_t port = 8080,
+        int family = AF_INET6)
+    {
+        using EL_t = Event_Loop__Poll__MT<
+            Concurrent_Queue_Type,
+            Thread_Pool_Type>;
+
+        // obtain the peer address
+        struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
+        if (!peer_addr) return 1;
+
+        // print the peer address
+        print_addrinfo<is_debug_mode>(peer_addr);
+
+        // create the peer socket
+        PRINTF1("[Client]: Creating the peer socket...\n");
+        Socket socket_peer {
+            peer_addr->ai_family,
+            peer_addr->ai_socktype,
+            peer_addr->ai_protocol};
+        if (!socket_peer.is_valid()) {
+            SOCKET_ERROR__SOCKET();
+            ::freeaddrinfo(peer_addr);
+            return 1;
+        }
+        SOCKET fd_peer = socket_peer.native_handle();
+
+        // connect to the remote server
+        PRINTF1("[Client]: Connecting to the remote server...\n");
+        if (socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen) < 0) {
+            ::freeaddrinfo(peer_addr);
+            return 1;
+        }
+        ::freeaddrinfo(peer_addr);
+
+        // inform the user
+        PRINTF1("[Client]: Connected to the remote server.\n");
+        PRINTF1("[Client]: To send data, enter text followed by enter.\n");
+
+        // create the event looop
+        EL_t el{ 100, std::thread::hardware_concurrency() };
+        el.fd_register(0, Enum_Event_Types::Read);
+        el.add_handler(
+            0,
+            std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
+            Enum_Event_Types::Read);
+
+        el.fd_register(fd_peer, Enum_Event_Types::Read);
+        el.add_handler(
+            fd_peer,
+            std::make_unique<Handler_Read_Forward<string_forward_t>>(&write_to_stdout),
+            Enum_Event_Types::Read);
+        el.run();
+
+        return 0;
+    }
+    
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    inline int TCP_client__poll__MT(
+        const std::string& hostname = "localhost",
+        uint16_t port = 8080,
+        int family = AF_INET6)
+    {
+        SOCKET_STARTUP();
+        int status = TCP_client__poll__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>(hostname, port, family);
+        SOCKET_CLEANUP();
+        return status;
+    }
+} // namespace BA_Socket
+
+#endif // TCP_CLIENT__POLL__MT_HPP
+
+
+// TCP_server__poll__MT.hpp
+
+#ifndef TCP_SERVER__POLL__MT_HPP
+#define TCP_SERVER__POLL__MT_HPP
+
+#include "Socket.hpp"
+#include "Event_Loop__Poll__MT.hpp"
+#include <ctype.h>
+#include <algorithm>
+
+using namespace BA_Concurrency;
+
+namespace BA_Socket {
+    inline bool to_up(std::string& str) {
+        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+        return true;
+    }
+
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    int TCP_server__poll__MT_helper() {
+        using EL_t = Event_Loop__Poll__MT<
+            Concurrent_Queue_Type,
+            Thread_Pool_Type>;
+
+        // create the server socket and bind to the local address
+        PRINTF1("[Server]: Creating socket for the server and binding it to the local address...\n");
+        Socket socket_listen = create_socket_bind_to_local_addr("all");
+        if (!socket_listen.is_valid()) return 1;
+        SOCKET fd_listen = socket_listen.native_handle();
+
+        // listen for connections
+        PRINTF1("[Server]: Listening for connections...(Ctrl+C to stop)\n");
+        if (!socket_listen.listen(10)) return 1;
+
+        // create the event looop
+        EL_t el{};
+        el.fd_register(fd_listen, Enum_Event_Types::Read);
+#ifdef SEPARATE_READ_WRITE
+        el.add_handler(
+            fd_listen,
+            std::make_unique<Handler_Accept<Handler_Read_Transform<string_transform_t, Handler_Write>>>(&to_up),
+            Enum_Event_Types::Read);
+#else
+        el.add_handler(
+            fd_listen,
+            std::make_unique<Handler_Accept<Handler_Read_Transform_Write<string_transform_t>>>(&to_up),
+            Enum_Event_Types::Read);
+#endif
+        el.run();
+
+        return 0;
+    }
+    
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    inline int TCP_server__poll__MT() {
+        SOCKET_STARTUP();
+        int status = TCP_server__poll__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>();
+        SOCKET_CLEANUP();
+        return status;
+    }
+} // namespace BA_Socket
+
+#endif // TCP_SERVER__POLL__MT_HPP
+
+
 // Event_Loop__Epoll.hpp
 
 #ifndef EVENT_LOOP__EPOLL_HPP
 #define EVENT_LOOP__EPOLL_HPP
 
-#include "IEvent_Loop.hpp"
-#include <sys/epoll.h>
-#include <unistd.h>
 #include <mutex>
 #include <atomic>
 #include <unordered_map>
+#include "IEvent_Loop.hpp"
 
 namespace BA_Socket {
     class Event_Loop__Epoll : public IEvent_Loop {
@@ -2316,6 +2553,21 @@ namespace BA_Socket {
         };
     };
 
+    struct Handler_Entry {
+        handler_ptr_t _handler__read{ nullptr };
+        handler_ptr_t _handler__write{ nullptr };
+        bool _active{ true };
+
+        Handler_Entry(
+            handler_ptr_t handler__read = nullptr,
+            handler_ptr_t handler__write = nullptr,
+            bool active = true)
+            :
+            _handler__read(std::move(handler__read)),
+            _handler__write(std::move(handler__write)),
+            _active(active) {}                
+    };
+
     struct Job {
         int _fd{-1};
         IHandler* _handler{};
@@ -2358,7 +2610,6 @@ namespace BA_Socket {
 #define UTILITY_ADDR_HPP
 
 #include "socket_setup.hpp"
-#include <cstring>
 #ifdef _WIN32
     #include <iphlpapi.h>
 #else
@@ -2612,79 +2863,89 @@ namespace BA_Socket {
 #endif // UTILITY_ADDR_HPP
 
 
-// Event_Loop__Poll.hpp
+// TCP_client__poll__ST.hpp
 
-#ifndef EVENT_LOOP__POLL_HPP
-#define EVENT_LOOP__POLL_HPP
+#ifndef TCP_CLIENT__POLL__ST_HPP
+#define TCP_CLIENT__POLL__ST_HPP
 
-#include "IEvent_Loop.hpp"
-#include <poll.h>
-#include <unistd.h>
-#include <mutex>
-#include <atomic>
-#include <vector>
-#include <unordered_map>
+#include "Socket.hpp"
+#include "Event_Loop__Poll__ST.hpp"
+#include <ctype.h>
 
 namespace BA_Socket {
-    class Event_Loop__Poll : public IEvent_Loop {
-        using Callback = std::function<void(const Socket&)>;
-        using sockmap_t = std::unordered_map<SOCKET, Socket>;
-    public:
-        Event_Loop__Poll(
-            Callback on_read,
-            Callback on_write,
-            Callback on_disconnect)
-            :
-            _on_read(on_read),
-            _on_write(on_write),
-            _on_disconnect(on_disconnect) {}
+    inline bool write_to_stdout(const std::string& buffer) {
+        printf("[Client]: Received (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
+        return true;
+    }
 
-        inline void fd_register(int fd, Enum_Event_Types type) override {
-            std::scoped_lock lk(_m);
+    int TCP_client__poll__ST_helper(
+        const std::string& hostname = "localhost",
+        uint16_t port = 8080,
+        int family = AF_INET6)
+    {
+        // obtain the peer address
+        struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
+        if (!peer_addr) return 1;
 
-            struct pollfd p{};
-            p.fd = fd;
-            p.events = (type == Enum_Event_Types::Read ? POLLIN : POLLOUT);
-            _pollfds.push_back(p);
+        // print the peer address
+        print_addrinfo<is_debug_mode>(peer_addr);
+
+        // create the peer socket
+        PRINTF1("[Client]: Creating the peer socket...\n");
+        Socket socket_peer {
+            peer_addr->ai_family,
+            peer_addr->ai_socktype,
+            peer_addr->ai_protocol};
+        if (!socket_peer.is_valid()) {
+            SOCKET_ERROR__SOCKET();
+            ::freeaddrinfo(peer_addr);
+            return 1;
         }
+        SOCKET fd_peer = socket_peer.native_handle();
 
-        inline void fd_unregister(int fd) override {
-            std::scoped_lock lk(_m);
-
-            _pollfds.erase(
-                std::remove_if(
-                    _pollfds.begin(),
-                    _pollfds.end(),
-                    [fd](const pollfd& p){ return p.fd == fd; }),
-                _pollfds.end());
+        // connect to the remote server
+        PRINTF1("[Client]: Connecting to the remote server...\n");
+        if (socket_peer.connect(peer_addr->ai_addr, peer_addr->ai_addrlen) < 0) {
+            ::freeaddrinfo(peer_addr);
+            return 1;
         }
+        ::freeaddrinfo(peer_addr);
 
-        void run() override {
-            _running.store(true);
-            while (_running.load()) {
-                int ready = ::poll(_pollfds.data(), _pollfds.size(), -1);
-                if (ready < 0) continue;
+        // inform the user
+        PRINTF1("[Client]: Connected to the remote server.\n");
+        PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
-                for (auto& p : _pollfds) {
-                    if (p.revents & POLLIN) _on_read(_sockmap[p.fd]);
-                    if (p.revents & POLLOUT) _on_write(_sockmap[p.fd]);
-                    if (p.revents & (POLLERR | POLLHUP)) _on_disconnect(_sockmap[p.fd]);
-                }
-            }
-        }
+        // create the event looop
+        Event_Loop__Poll__ST el{ 100 };
+        el.fd_register(0, Enum_Event_Types::Read);
+        el.add_handler(
+            0,
+            std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
+            Enum_Event_Types::Read);
 
-        inline void stop() override { _running.store(false); }
+        el.fd_register(fd_peer, Enum_Event_Types::Read);
+        el.add_handler(
+            fd_peer,
+            std::make_unique<Handler_Read_Forward<string_forward_t>>(&write_to_stdout),
+            Enum_Event_Types::Read);
+        el.run();
 
-    private:
-        sockmap_t _sockmap;
-        std::vector<pollfd> _pollfds;
-        Callback _on_read, _on_write, _on_disconnect;
-        std::mutex _m;
-        std::atomic<bool> _running{false};
-    };
+        return 0;
+    }
+    
+    inline int TCP_client__poll__ST(
+        const std::string& hostname = "localhost",
+        uint16_t port = 8080,
+        int family = AF_INET6)
+    {
+        SOCKET_STARTUP();
+        int status = TCP_client__poll__ST_helper(hostname, port, family);
+        SOCKET_CLEANUP();
+        return status;
+    }
 } // namespace BA_Socket
 
-#endif // EVENT_LOOP__POLL_HPP
+#endif // TCP_CLIENT__POLL__ST_HPP
 
 
 // IEvent_Loop.hpp
@@ -2709,6 +2970,441 @@ namespace BA_Socket {
 } // namespace BA_Socket
 
 #endif // IEVENT_LOOP_HPP
+
+
+// Event_Loop__Poll.hpp
+
+#ifndef EVENT_LOOP__POLL__ST_HPP
+#define EVENT_LOOP__POLL__ST_HPP
+
+#include <unordered_map>
+#include <vector>
+#include <atomic>
+#include "poll_setup.hpp"
+#include "IEvent_Loop.hpp"
+#include "Handler.hpp"
+
+namespace BA_Socket {
+
+    class Event_Loop__Poll__ST : public IEvent_Loop {
+    public:
+        Event_Loop__Poll__ST(int msec = -1) : _msec(msec) {}
+
+        inline void fd_register(int fd, Enum_Event_Types event_type) override {
+            if (event_type == Enum_Event_Types::None) return;
+
+            short events = 0;
+            if (event_type == Enum_Event_Types::Read) {
+                events |= POLL_IN;
+            } else if (event_type == Enum_Event_Types::Write) {
+                events |= POLL_OUT;
+            } else { // Read_Write
+                events |= POLL_IN | POLL_OUT;
+            }
+
+            // update or add pollfd
+            auto it = std::find_if(
+                _pollfds.begin(),
+                _pollfds.end(),
+                [fd](const auto& pollfd_){ return pollfd_.fd == fd; });
+            if (it != _pollfds.end()) {
+                it->events |= events;
+            } else {
+                pollfd_t pollfd_{};
+                pollfd_.fd = fd;
+                pollfd_.events = events;
+                pollfd_.revents = 0;
+                _pollfds.push_back(pollfd_);
+            }
+        }
+
+        inline void fd_unregister(int fd) override {
+            _pollfds.erase(
+                std::remove_if(
+                    _pollfds.begin(),
+                    _pollfds.end(),
+                    [fd](const pollfd_t& pollfd_){ return pollfd_.fd == fd; }),
+                _pollfds.end());
+            _handler_entrys.erase(fd);
+        }
+
+        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
+            if (!handler) return;
+            if (event_type == Enum_Event_Types::None) return;
+
+            auto& handler_entry = _handler_entrys[fd];
+            if (event_type == Enum_Event_Types::Read) {
+                handler_entry._handler__read = std::move(handler);
+            } else if (event_type == Enum_Event_Types::Write) {
+                handler_entry._handler__write = std::move(handler);
+            }
+        }
+
+        inline void run() override {
+            _running.store(true);
+            while (_running.load()) {
+                if (_pollfds.empty()) break;
+
+                // perform poll operation
+                std::vector<pollfd_t> pollfds_copy = _pollfds;
+                int status = poll_execute(
+                    pollfds_copy.data(),
+                    static_cast<nfds_t>(pollfds_copy.size()),
+                    _msec);
+                if (status < 0) {
+                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
+                    SOCKET_ERROR__POLL();
+                    break;
+                }
+                if (status == 0) continue; // timeout
+
+                // execute the handlers in the handler entry map
+                reactor_command_pack_t rcp_next;
+                execute_handlers(rcp_next, pollfds_copy);
+
+                // apply the next reactor commands returned from the current handlers in the map
+                apply_reactor_commands(rcp_next);
+            }
+        }
+
+        inline void stop() override {
+            _running.store(false);
+        }
+
+    private:
+
+        // get the handler entry from the pollfd
+        inline Handler_Entry* get_handler_entry_ptr(const pollfd_t & pollfd_) {
+            if (pollfd_.revents == 0) return nullptr;
+            if (!IS_VALID_SOCKET(pollfd_.fd)) return nullptr;
+#if defined(_WIN32)
+            if (pollfd_.fd == 0 && !_kbhit()) return nullptr;
+#endif
+
+            auto it = _handler_entrys.find(pollfd_.fd);
+            if (it == _handler_entrys.end()) return nullptr;
+            auto& handler_entry = it->second;
+            if (!handler_entry._active) return nullptr;
+            return &handler_entry;
+        }
+
+        // execute the handlers in the handler entry map
+        void execute_handlers(
+            reactor_command_pack_t& rcp_next,
+            const std::vector<pollfd_t>& pollfds_copy)
+        {
+            for (const auto& pollfd_ : pollfds_copy) {
+                // get the handler entry from the pollfd
+                auto handler_entry_ptr = get_handler_entry_ptr(pollfd_);
+                if (!handler_entry_ptr) continue;
+
+                // execute the read handler
+                if ((pollfd_.revents & POLL_IN) && handler_entry_ptr->_handler__read) {
+                    auto rcp = handler_entry_ptr->_handler__read->apply(pollfd_.fd);
+                    for (auto& rc : rcp) {
+                        if (rc._register_type == Enum_Register_Types::Unregister) {
+                            handler_entry_ptr->_active = false;
+                        }
+                        rcp_next.push_back(std::move(rc));
+                    }
+                }
+
+                // execute the write handler
+                if ((pollfd_.revents & POLL_OUT) && handler_entry_ptr->_handler__write) {
+                    auto rcp = handler_entry_ptr->_handler__write->apply(pollfd_.fd);
+                    for (auto& rc : rcp) {
+                        if (rc._register_type == Enum_Register_Types::Unregister) {
+                            handler_entry_ptr->_active = false;
+                        }
+                        rcp_next.push_back(std::move(rc));
+                    }
+                }
+            }
+        }
+
+        // apply the next reactor commands returned from the current handlers in the map
+        void apply_reactor_commands(reactor_command_pack_t& rcp_next) {
+            // update the fd_sets and the handler maps.
+            for (auto& [fd, register_type, event_type, handler_command_type, handler__new] : rcp_next) {
+                if (register_type == Enum_Register_Types::Unregister) {
+                    fd_unregister(fd);
+                }
+                else if (register_type == Enum_Register_Types::Register) {
+                    fd_register(fd, event_type);
+                }
+                if (
+                    handler_command_type == Enum_Handler_Command_Types::Add ||
+                    handler_command_type == Enum_Handler_Command_Types::Replace)
+                {
+                    add_handler(fd, std::move(handler__new), event_type);
+                }
+            }
+        }
+
+        std::unordered_map<int, Handler_Entry> _handler_entrys;
+        std::vector<pollfd_t> _pollfds;
+        int _msec{ -1 };
+        std::atomic<bool> _running{ false };
+    };
+
+} // namespace BA_Socket
+
+#endif // EVENT_LOOP__POLL__ST_HPP
+
+
+// Event_Loop__Poll__MT.hpp
+// Multi-threaded poll event loop
+
+#ifndef EVENT_LOOP__POLL__MT_HPP
+#define EVENT_LOOP__POLL__MT_HPP
+
+#include <unordered_map>
+#include <vector>
+#include <atomic>
+#include <thread>
+#include <optional>
+#include "poll_setup.hpp"
+#include "IEvent_Loop.hpp"
+#include "Handler.hpp"
+
+namespace BA_Socket {
+    template <template <typename> typename Concurrent_Queue_Type>
+    void execute_job(
+        const Job& job,
+        Concurrent_Queue_Type<job_result_t>& job_results)
+    {
+        auto rcp = std::move(job._handler->apply(job._fd));
+        for (auto& rc : rcp) {
+            job_results.push(std::move(rc));
+        }
+    };
+
+    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
+        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
+    class Event_Loop__Poll__MT : public IEvent_Loop {
+    public:
+        Event_Loop__Poll__MT(
+            int msec = -1,
+            size_t thread_count = std::thread::hardware_concurrency())
+                : _msec(msec), _tp(thread_count == 0 ? 1 : thread_count) {}
+
+        inline void fd_register(int fd, Enum_Event_Types event_type) override {
+            if (event_type == Enum_Event_Types::None) return;
+
+            short events = 0;
+            if (event_type == Enum_Event_Types::Read) {
+                events |= POLL_IN;
+            } else if (event_type == Enum_Event_Types::Write) {
+                events |= POLL_OUT;
+            } else { // Read_Write
+                events |= POLL_IN | POLL_OUT;
+            }
+
+            // update or add pollfd
+            auto it = std::find_if(
+                _pollfds.begin(),
+                _pollfds.end(),
+                [fd](const auto& pollfd_){ return pollfd_.fd == fd; });
+            if (it != _pollfds.end()) {
+                it->events |= events;
+            } else {
+                pollfd_t pollfd_{};
+                pollfd_.fd = fd;
+                pollfd_.events = events;
+                pollfd_.revents = 0;
+                _pollfds.push_back(pollfd_);
+            }
+        }
+
+        inline void fd_unregister(int fd) override {
+            _pollfds.erase(
+                std::remove_if(
+                    _pollfds.begin(),
+                    _pollfds.end(),
+                    [fd](const pollfd_t& pollfd_){ return pollfd_.fd == fd; }),
+                _pollfds.end());
+            _handler_entrys.erase(fd);
+        }
+
+        inline void add_handler(int fd, handler_ptr_t&& handler, Enum_Event_Types event_type) {
+            if (!handler) return;
+            if (event_type == Enum_Event_Types::None) return;
+
+            auto& handler_entry = _handler_entrys[fd];
+            if (event_type == Enum_Event_Types::Read) {
+                handler_entry._handler__read = std::move(handler);
+            } else if (event_type == Enum_Event_Types::Write) {
+                handler_entry._handler__write = std::move(handler);
+            }
+        }
+
+        inline void run() override {
+            _running.store(true);
+
+            // main loop
+            while (_running.load()) {
+                if (_pollfds.empty()) break;
+
+                // perform poll operation
+                std::vector<pollfd_t> pollfds_copy = _pollfds;
+                int status = poll_execute(
+                    pollfds_copy.data(),
+                    static_cast<nfds_t>(pollfds_copy.size()),
+                    _msec);
+                if (status < 0) {
+                    if (GET_SOCKET_ERRNO() == ERROR_INTERRUPTED) continue;
+                    SOCKET_ERROR__POLL();
+                    break;
+                }
+                if (status == 0) continue; // timeout
+
+                // create jobs from the current handler entry map
+                create_jobs(pollfds_copy);
+
+                // submit the jobs via the thread pool - multiple threads
+                submit_jobs();
+
+                // apply the next reactor commands returned from the current handlers in the map - single thread
+                apply_reactor_commands();
+            }
+        };
+
+        inline void stop() noexcept override {
+            _running.store(false);
+        }
+
+    private:
+
+        // get the handler entry from the pollfd
+        inline Handler_Entry* get_handler_entry_ptr(const pollfd_t & pollfd_) {
+            if (pollfd_.revents == 0) return nullptr;
+            if (!IS_VALID_SOCKET(pollfd_.fd)) return nullptr;
+#if defined(_WIN32)
+            if (pollfd_.fd == 0 && !_kbhit()) return nullptr;
+#endif
+
+            auto it = _handler_entrys.find(pollfd_.fd);
+            if (it == _handler_entrys.end()) return nullptr;
+            auto& handler_entry = it->second;
+            if (!handler_entry._active) return nullptr;
+            return &handler_entry;
+        }
+
+        // create jobs from the current handler entry map
+        void create_jobs(
+            const std::vector<pollfd_t>& pollfds_copy)
+        {
+            for (const auto& pollfd_ : pollfds_copy) {
+                // get the handler entry from the pollfd
+                auto handler_entry_ptr = get_handler_entry_ptr(pollfd_);
+                if (!handler_entry_ptr) continue;
+
+                // add the new jobs into _jobs
+                if ((pollfd_.revents & POLL_IN) && handler_entry_ptr->_handler__read) {
+                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__read));
+                }
+                if ((pollfd_.revents & POLL_OUT) && handler_entry_ptr->_handler__write) {
+                    _jobs.push(Job(pollfd_.fd, handler_entry_ptr->_handler__write));
+                }
+            }
+        }
+
+        // submit the jobs via the thread pool - multiple threads
+        // notice that this function is executed in the main thread.
+        // hence, operations on _jobs are single-threaded and safe (especially _job_results.empty()).
+        void submit_jobs() {
+            while (!_jobs.empty()) {
+                auto job{ _jobs.pop() };
+                if (!job.has_value()) continue;
+
+                auto job_val = std::move(job.value());
+                _tp.submit(
+                    [job_val, this]()
+                    { execute_job<Concurrent_Queue_Type>(job_val, _job_results); });
+            }
+        }
+
+        // apply the next reactor commands returned from the current handlers in the map.
+        // notice that this function is executed in the main thread,
+        // and starts with a call to wait_all_jobs on the thread pool.
+        // hence, the operations on _job_results are single-threaded and safe (especially _job_results.empty()).
+        void apply_reactor_commands() {
+            // wait till all workers finish
+            _tp.wait_all_jobs();
+
+            // apply the reactor commands
+            while (!_job_results.empty()) {
+                auto job_result{ _job_results.pop() };
+                if (!job_result.has_value()) continue;
+
+                auto& [fd, register_type, event_type, handler_command_type, handler__new] = job_result.value();
+                if (register_type == Enum_Register_Types::Unregister) {
+                    fd_unregister(fd);
+                }
+                else if (register_type == Enum_Register_Types::Register) {
+                    fd_register(fd, event_type);
+                }
+                if (
+                    handler_command_type == Enum_Handler_Command_Types::Add ||
+                    handler_command_type == Enum_Handler_Command_Types::Replace)
+                {
+                    add_handler(fd, std::move(handler__new), event_type);
+                }
+            }
+        }
+
+        std::unordered_map<int, Handler_Entry> _handler_entrys;
+        std::vector<pollfd_t> _pollfds;
+        Concurrent_Queue_Type<Job> _jobs;
+        Concurrent_Queue_Type<job_result_t> _job_results;
+        Thread_Pool_Type _tp;
+        int _msec{ -1 };
+        std::atomic<bool> _running{ false };
+    };
+} // namespace BA_Socket
+
+#endif // EVENT_LOOP__POLL__MT_HPP
+
+
+// poll_setup.hpp
+
+#ifndef POLL_SETUP_HPP
+#define POLL_SETUP_HPP
+
+#include "socket_setup.hpp"
+#if defined(_WIN32)
+    #include <mstcpip.h>
+#else
+    #include <poll.h>
+#endif
+#include <vector>
+
+// uniform event flags
+#if defined(_WIN32)
+    #define POLL_IN   POLLRDNORM
+    #define POLL_OUT  POLLWRNORM
+    #define POLL_ERR  POLLERR
+    #define POLL_HUP  POLLHUP
+    #define POLL_NVAL POLLNVAL
+
+    using pollfd_t = WSAPOLLFD;
+    inline int poll_execute(pollfd_t* fds, ULONG nfds, INT timeout) {
+        return ::WSAPoll(fds, nfds, timeout);
+    }
+#else
+    #define POLL_IN   POLLIN
+    #define POLL_OUT  POLLOUT
+    #define POLL_ERR  POLLERR
+    #define POLL_HUP  POLLHUP
+    #define POLL_NVAL POLLNVAL
+
+    using pollfd_t = struct pollfd;
+    inline int poll_execute(pollfd_t* fds, nfds_t nfds, int timeout) {
+        return ::poll(fds, nfds, timeout);
+    }
+#endif
+
+#endif // POLL_SETUP_HPP
 
 
 // TCP_server.hpp
@@ -2817,5 +3513,3 @@ namespace BA_Socket {
 } // namespace BA_Socket
 
 #endif // TCP_SERVER_HPP
-
-

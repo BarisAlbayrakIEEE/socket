@@ -1,31 +1,19 @@
-// TCP_client__select__MT.hpp
+// TCP__Client__Mid__ST.hpp
 
-#ifndef TCP_CLIENT__SELECT__MT_HPP
-#define TCP_CLIENT__SELECT__MT_HPP
+#ifndef TCP__CLIENT__MID__ST_HPP
+#define TCP__CLIENT__MID__ST_HPP
 
 #include "Socket.hpp"
-#include "Event_Loop__Select__MT.hpp"
+#include "Event_Loop__Mid__ST.hpp"
+#include "aux_functions.hpp"
 #include <ctype.h>
 
-using namespace BA_Concurrency;
-
 namespace BA_Socket {
-    inline bool write_to_stdout(const std::string& buffer) {
-        printf("[Client]: Received (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
-        return true;
-    }
-
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    int TCP_client__select__MT_helper(
+    int TCP__Client__Mid__ST_helper(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
     {
-        using EL_t = Event_Loop__Select__MT<
-            Concurrent_Queue_Type,
-            Thread_Pool_Type>;
-
         // obtain the peer address
         struct addrinfo *peer_addr = get_addrinfo(SOCK_STREAM, hostname, port, family);
         if (!peer_addr) return 1;
@@ -59,35 +47,33 @@ namespace BA_Socket {
         PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // create the event looop
-        EL_t el{ 0, 100000, std::thread::hardware_concurrency() };
-        el.fd_register(0, Enum_Event_Types::Read);
-        el.add_handler(
+        Event_Loop__Mid__ST el{ 100 };
+        el.fd_register(0, Enum_IO_Event_Types::Read);
+        el.add_event_handler(
             0,
             std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
 
-        el.fd_register(fd_peer, Enum_Event_Types::Read);
-        el.add_handler(
+        el.fd_register(fd_peer, Enum_IO_Event_Types::Read);
+        el.add_event_handler(
             fd_peer,
             std::make_unique<Handler_Read_Forward<string_forward_t>>(&write_to_stdout),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
         el.run();
 
         return 0;
     }
     
-    template <template <typename> typename Concurrent_Queue_Type, typename Thread_Pool_Type>
-        requires CEL<Concurrent_Queue_Type, Thread_Pool_Type, Job, job_result_t>
-    inline int TCP_client__select__MT(
+    inline int TCP__Client__Mid__ST(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
     {
         SOCKET_STARTUP();
-        int status = TCP_client__select__MT_helper<Concurrent_Queue_Type, Thread_Pool_Type>(hostname, port, family);
+        int status = TCP__Client__Mid__ST_helper(hostname, port, family);
         SOCKET_CLEANUP();
         return status;
     }
 } // namespace BA_Socket
 
-#endif // TCP_CLIENT__SELECT__MT_HPP
+#endif // TCP__CLIENT__MID__ST_HPP

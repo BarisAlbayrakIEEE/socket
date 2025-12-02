@@ -1,12 +1,12 @@
-// Handler.hpp
+// Event_Handler.hpp
 
-#ifndef HANDLER_HPP
-#define HANDLER_HPP
+#ifndef EVENT_HANDLER_HPP
+#define EVENT_HANDLER_HPP
 
 #include <functional>
 #include <utility>
 #include "utility_addr.hpp"
-#include "IHandler.hpp"
+#include "IEvent_Handler.hpp"
 
 namespace BA_Socket {
     // read helper function: convinience function to wrap fgets and ::recv
@@ -45,7 +45,7 @@ namespace BA_Socket {
     inline void write_helper(
         int fd,
         const std::string& buffer,
-        reactor_command_pack_t& rcp)
+        reactor_event_pack_t& rep)
     {
         if (fd == 1) {
             printf(buffer.c_str());
@@ -61,10 +61,10 @@ namespace BA_Socket {
             // partial send: schedule write handler to continue later
             if (bytes_sent > 0) {
                 std::string remaining = buffer.substr(bytes_sent);
-                rcp.emplace_back(
+                rep.emplace_back(
                     fd,
                     Enum_Register_Types::Register,
-                    Enum_Event_Types::Write,
+                    Enum_IO_Event_Types::Write,
                     Enum_Handler_Command_Types::Add,
                     std::make_unique<Handler_Write>(std::move(remaining)));
                 return;
@@ -74,10 +74,10 @@ namespace BA_Socket {
             if (bytes_sent == 0) {
                 PRINTF1("[Handler]: Peer closed the connection.\n");
                 CLOSE_SOCKET(fd);
-                rcp.emplace_back(
+                rep.emplace_back(
                     fd,
                     Enum_Register_Types::Unregister,
-                    Enum_Event_Types::Read_Write,
+                    Enum_IO_Event_Types::Read_Write,
                     Enum_Handler_Command_Types::Remove,
                     nullptr);
                 return;
@@ -88,10 +88,10 @@ namespace BA_Socket {
 
             // transient errors: retry later
             if (status == ERROR_INTERRUPTED || status == ERROR_BLOCKED) {
-                rcp.emplace_back(
+                rep.emplace_back(
                     fd,
                     Enum_Register_Types::Register,
-                    Enum_Event_Types::Write,
+                    Enum_IO_Event_Types::Write,
                     Enum_Handler_Command_Types::Add,
                     std::make_unique<Handler_Write>(buffer));
                 return;
@@ -100,10 +100,10 @@ namespace BA_Socket {
             // deal with separate EWOULDBLOCK
 #if !defined(_WIN32)
             if (status == EWOULDBLOCK) {
-                rcp.emplace_back(
+                rep.emplace_back(
                     fd,
                     Enum_Register_Types::Register,
-                    Enum_Event_Types::Write,
+                    Enum_IO_Event_Types::Write,
                     Enum_Handler_Command_Types::Add,
                     std::make_unique<Handler_Write>(buffer));
                 return;
@@ -113,10 +113,10 @@ namespace BA_Socket {
             // unhandled send failure
             PRINTF1("[Handler]: Unhandled send failure.\n");
             CLOSE_SOCKET(fd);
-            rcp.emplace_back(
+            rep.emplace_back(
                 fd,
                 Enum_Register_Types::Unregister,
-                Enum_Event_Types::Read_Write,
+                Enum_IO_Event_Types::Read_Write,
                 Enum_Handler_Command_Types::Remove,
                 nullptr);
         }
@@ -129,7 +129,7 @@ namespace BA_Socket {
     //
     // Handler command:
     //   None
-    struct Handler_Write : public IHandler {
+    struct Handler_Write : public IEvent_Handler {
         std::string _buffer{};
 
         explicit Handler_Write(const std::string& buffer)
@@ -137,17 +137,17 @@ namespace BA_Socket {
         explicit Handler_Write(std::string&& buffer)
             : _buffer(std::move(buffer)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // send the data to the peer
             PRINTF1("[Handler]: Sending the data to the peer...\n");
-            reactor_command_pack_t rcp{};
-            write_helper(fd, _buffer, rcp);
+            reactor_event_pack_t rep{};
+            write_helper(fd, _buffer, rep);
 
             // return the handler pack
-            if (rcp.empty()) {
+            if (rep.empty()) {
                 HANDLER_RETURN_PACK__NONE();
             }
-            return rcp;
+            return rep;
         };
     };
     
@@ -158,7 +158,7 @@ namespace BA_Socket {
     //
     // Handler command:
     //   None
-    struct Handler_Redirect : public IHandler {
+    struct Handler_Redirect : public IEvent_Handler {
         std::string _buffer{};
         std::vector<int> _fds{};
 
@@ -167,19 +167,19 @@ namespace BA_Socket {
         Handler_Redirect(std::string&& buffer, std::vector<int>&& fds)
             : _buffer(std::move(buffer)), _fds(std::move(fds)) {};
 
-        inline reactor_command_pack_t apply(int fd) const override {
+        inline reactor_event_pack_t apply(int fd) const override {
             // send the data to the peer
             PRINTF1("[Handler]: Sending the data to the peer...\n");
-            reactor_command_pack_t rcp{};
+            reactor_event_pack_t rep{};
             for (int fd__redirect: _fds) {
-                write_helper(fd__redirect, _buffer, rcp);
+                write_helper(fd__redirect, _buffer, rep);
             }
 
             // return the handler pack
-            if (rcp.empty()) {
+            if (rep.empty()) {
                 HANDLER_RETURN_PACK__NONE();
             }
-            return rcp;
+            return rep;
         };
     };
 
@@ -194,13 +194,13 @@ namespace BA_Socket {
     //   None
     template <typename F>
         requires CString_Forward<F>
-    struct Handler_Read_Forward : public IHandler {
+    struct Handler_Read_Forward : public IEvent_Handler {
         F const* _forwarder{};
 
         explicit Handler_Read_Forward(F const* forwarder)
             : _forwarder(forwarder) {};
         
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             std::string buffer;
             if (!read_helper(fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(fd);
@@ -229,7 +229,7 @@ namespace BA_Socket {
     //
     // Handler command:
     //   None
-    struct Handler_Read_Redirect : public IHandler {
+    struct Handler_Read_Redirect : public IEvent_Handler {
         std::vector<int> _fds{};
 
         explicit Handler_Read_Redirect(const std::vector<int>& fds)
@@ -237,7 +237,7 @@ namespace BA_Socket {
         explicit Handler_Read_Redirect(std::vector<int>&& fds)
             : _fds(std::move(fds)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             std::string buffer;
             if (!read_helper(fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(fd);
@@ -245,16 +245,16 @@ namespace BA_Socket {
 
             // redirect the data to the contained fds
             PRINTF1("[Handler]: Redirecting the data to the ...\n");
-            reactor_command_pack_t rcp{};
+            reactor_event_pack_t rep{};
             for (int fd__redirect: _fds) {
-                write_helper(fd__redirect, buffer, rcp);
+                write_helper(fd__redirect, buffer, rep);
             }
 
             // return the handler pack
-            if (rcp.empty()) {
+            if (rep.empty()) {
                 HANDLER_RETURN_PACK__NONE();
             }
-            return rcp;
+            return rep;
         };
     };
 
@@ -276,13 +276,13 @@ namespace BA_Socket {
             (
                 std::is_same_v<Next_Handler_Type, Handler_Write> ||
                 std::is_same_v<Next_Handler_Type, Handler_Redirect>)
-    struct Handler_Read_Transform : public IHandler {
+    struct Handler_Read_Transform : public IEvent_Handler {
         F const* _transformer{};
 
         explicit Handler_Read_Transform(F const* transformer)
             : _transformer(transformer) {};
         
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             std::string buffer;
             if (!read_helper(fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(fd);
@@ -298,14 +298,14 @@ namespace BA_Socket {
             }
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Write,
+                Enum_IO_Event_Types::Write,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Write>(std::move(buffer)));
-            return rcp;
+            return rep;
         };
     };
 
@@ -322,7 +322,7 @@ namespace BA_Socket {
     //   Adds a new Handler_Redirect.
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform<F, Handler_Redirect> : public IHandler {
+    struct Handler_Read_Transform<F, Handler_Redirect> : public IEvent_Handler {
         F const* _transformer{};
         std::vector<int> _fds{};
 
@@ -331,7 +331,7 @@ namespace BA_Socket {
         Handler_Read_Transform(F const* transformer, std::vector<int>&& fds)
             : _transformer(transformer), _fds(std::move(fds)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             std::string buffer;
             if (!read_helper(fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(fd);
@@ -347,14 +347,14 @@ namespace BA_Socket {
             }
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Write,
+                Enum_IO_Event_Types::Write,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Redirect>(std::move(buffer), _fds));
-            return rcp;
+            return rep;
         };
     };
 
@@ -369,13 +369,13 @@ namespace BA_Socket {
     //   None
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform_Write : public IHandler {
+    struct Handler_Read_Transform_Write : public IEvent_Handler {
         F const* _transformer{};
 
         explicit Handler_Read_Transform_Write(F const* transformer)
             : _transformer(transformer) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             std::string buffer;
             if (!read_helper(fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(fd);
@@ -392,14 +392,14 @@ namespace BA_Socket {
 
             // send the transformed data back to the peer
             PRINTF1("[Handler]: Sending the transformed data back to the peer...\n");
-            reactor_command_pack_t rcp{};
-            write_helper(fd, buffer, rcp);
+            reactor_event_pack_t rep{};
+            write_helper(fd, buffer, rep);
 
             // return the handler pack
-            if (rcp.empty()) {
+            if (rep.empty()) {
                 HANDLER_RETURN_PACK__NONE();
             }
-            return rcp;
+            return rep;
         };
     };
 
@@ -414,7 +414,7 @@ namespace BA_Socket {
     //   None
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform_Redirect : public IHandler {
+    struct Handler_Read_Transform_Redirect : public IEvent_Handler {
         F const* _transformer{};
         std::vector<int> _fds{};
 
@@ -423,7 +423,7 @@ namespace BA_Socket {
         Handler_Read_Transform_Redirect(F const* transformer, std::vector<int>&& fds)
             : _transformer(transformer), _fds(std::move(fds)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             std::string buffer;
             if (!read_helper(fd, buffer)) {
                 HANDLER_RETURN_PACK__UNREGISTER(fd);
@@ -440,16 +440,16 @@ namespace BA_Socket {
 
             // redirect the data to the contained fds
             PRINTF1("[Handler]: Redirecting the data to the ...\n");
-            reactor_command_pack_t rcp{};
+            reactor_event_pack_t rep{};
             for (int fd__redirect: _fds) {
-                write_helper(fd__redirect, buffer, rcp);
+                write_helper(fd__redirect, buffer, rep);
             }
 
             // return the handler pack
-            if (rcp.empty()) {
+            if (rep.empty()) {
                 HANDLER_RETURN_PACK__NONE();
             }
-            return rcp;
+            return rep;
         };
     };
 
@@ -464,8 +464,8 @@ namespace BA_Socket {
     // Handler command:
     //   Adds a new Handler_Write.
     template <typename Next_Handler_Type>
-        requires std::is_base_of_v<IHandler, Next_Handler_Type>
-    struct Handler_Accept : public IHandler {
+        requires std::is_base_of_v<IEvent_Handler, Next_Handler_Type>
+    struct Handler_Accept : public IEvent_Handler {
         std::string _buffer{};
 
         explicit Handler_Accept(const std::string& buffer)
@@ -473,7 +473,7 @@ namespace BA_Socket {
         explicit Handler_Accept(std::string&& buffer)
             : _buffer(std::move(buffer)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
@@ -490,14 +490,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd_client,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Write,
+                Enum_IO_Event_Types::Write,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Write>(_buffer));
-            return rcp;
+            return rep;
         };
     };
 
@@ -512,13 +512,13 @@ namespace BA_Socket {
     //   Adds a new Handler_Read_Forward<F>.
     template <typename F>
         requires CString_Forward<F>
-    struct Handler_Accept<Handler_Read_Forward<F>> : public IHandler {
+    struct Handler_Accept<Handler_Read_Forward<F>> : public IEvent_Handler {
         F const* _forwarder{};
 
         explicit Handler_Accept(F const* forwarder)
             : _forwarder(forwarder) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
@@ -535,14 +535,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd_client,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Read,
+                Enum_IO_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Read_Forward<F>>(_forwarder));
-            return rcp;
+            return rep;
         };
     };
 
@@ -556,7 +556,7 @@ namespace BA_Socket {
     // Handler command:
     //   Adds a new Handler_Read_Redirect.
     template <>
-    struct Handler_Accept<Handler_Read_Redirect> : public IHandler {
+    struct Handler_Accept<Handler_Read_Redirect> : public IEvent_Handler {
         std::vector<int> _fds{};
 
         explicit Handler_Accept(const std::vector<int>& fds)
@@ -564,7 +564,7 @@ namespace BA_Socket {
         explicit Handler_Accept(std::vector<int>&& fds)
             : _fds(std::move(fds)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
@@ -581,14 +581,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd_client,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Read,
+                Enum_IO_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Read_Redirect>(_fds));
-            return rcp;
+            return rep;
         };
     };
 
@@ -603,13 +603,13 @@ namespace BA_Socket {
     //   Adds a new Handler_Read_Transform<F, Handler_Write>.
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Accept<Handler_Read_Transform<F, Handler_Write>> : public IHandler {
+    struct Handler_Accept<Handler_Read_Transform<F, Handler_Write>> : public IEvent_Handler {
         F const* _transformer{};
 
         explicit Handler_Accept(F const* transformer)
             : _transformer(transformer) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
@@ -626,14 +626,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd_client,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Read,
+                Enum_IO_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Read_Transform<F, Handler_Write>>(_transformer));
-            return rcp;
+            return rep;
         };
     };
 
@@ -648,7 +648,7 @@ namespace BA_Socket {
     //   Adds a new Handler_Read_Transform<F, Handler_Redirect>.
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Accept<Handler_Read_Transform<F, Handler_Redirect>> : public IHandler {
+    struct Handler_Accept<Handler_Read_Transform<F, Handler_Redirect>> : public IEvent_Handler {
         F const* _transformer{};
         std::vector<int> _fds{};
 
@@ -657,7 +657,7 @@ namespace BA_Socket {
         Handler_Accept(F const* transformer, std::vector<int>&& fds)
             : _transformer(transformer), _fds(std::move(fds)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
@@ -674,14 +674,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd_client,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Read,
+                Enum_IO_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Read_Transform<F, Handler_Redirect>>(_transformer, _fds));
-            return rcp;
+            return rep;
         };
     };
 
@@ -696,13 +696,13 @@ namespace BA_Socket {
     //   Adds a new Handler_Read_Transform_Write<F>.
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Accept<Handler_Read_Transform_Write<F>> : public IHandler {
+    struct Handler_Accept<Handler_Read_Transform_Write<F>> : public IEvent_Handler {
         F const* _transformer{};
 
         explicit Handler_Accept(F const* transformer)
             : _transformer(transformer) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
@@ -719,14 +719,14 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd_client,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Read,
+                Enum_IO_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Read_Transform_Write<F>>(_transformer));
-            return rcp;
+            return rep;
         };
     };
 
@@ -741,7 +741,7 @@ namespace BA_Socket {
     //   Adds a new Handler_Read_Transform_Redirect<F>.
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Accept<Handler_Read_Transform_Redirect<F>> : public IHandler {
+    struct Handler_Accept<Handler_Read_Transform_Redirect<F>> : public IEvent_Handler {
         F const* _transformer{};
         std::vector<int> _fds{};
 
@@ -750,7 +750,7 @@ namespace BA_Socket {
         Handler_Accept(F const* transformer, std::vector<int>&& fds)
             : _transformer(transformer), _fds(std::move(fds)) {};
 
-        reactor_command_pack_t apply(int fd) const override {
+        reactor_event_pack_t apply(int fd) const override {
             // accept a new connection
             PRINTF1("[Handler]: Accepting a new connection...\n");
             fflush(stdout);
@@ -767,16 +767,16 @@ namespace BA_Socket {
             print_sockaddr<is_debug_mode>(client_addr, client_len);
 
             // return the handler pack
-            reactor_command_pack_t rcp{};
-            rcp.emplace_back(
+            reactor_event_pack_t rep{};
+            rep.emplace_back(
                 fd_client,
                 Enum_Register_Types::Register,
-                Enum_Event_Types::Read,
+                Enum_IO_Event_Types::Read,
                 Enum_Handler_Command_Types::Add,
                 std::make_unique<Handler_Read_Transform_Redirect<F>>(_transformer, _fds));
-            return rcp;
+            return rep;
         };
     };
 } // namespace BA_Socket
 
-#endif // HANDLER_HPP
+#endif // EVENT_HANDLER_HPP

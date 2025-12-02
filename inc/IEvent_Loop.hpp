@@ -11,12 +11,18 @@ namespace BA_Socket {
     public:
         virtual ~IEvent_Loop() = default;
 
-        virtual void fd_register(int, Enum_Event_Types) = 0;
+        virtual void fd_register(int, Enum_IO_Event_Types) = 0;
         virtual void fd_unregister(int) = 0;
 
         virtual void run() = 0; // blocking
         virtual void stop() = 0;
     };
+
+    template <
+        Enum_Event_Loop_Types Event_Loop_Type,
+        Enum_Concurrency_Types Concurrency_Type,
+        typename... Args>
+    class Event_Loop{};
 } // namespace BA_Socket
 
 #endif // IEVENT_LOOP_HPP

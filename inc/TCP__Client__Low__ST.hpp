@@ -1,19 +1,15 @@
-// TCP_client__poll__ST.hpp
+// TCP__Client__Low__ST.hpp
 
-#ifndef TCP_CLIENT__POLL__ST_HPP
-#define TCP_CLIENT__POLL__ST_HPP
+#ifndef TCP__CLIENT__LOW__ST_HPP
+#define TCP__CLIENT__LOW__ST_HPP
 
 #include "Socket.hpp"
-#include "Event_Loop__Poll__ST.hpp"
+#include "Event_Loop__Low__ST.hpp"
+#include "aux_functions.hpp"
 #include <ctype.h>
 
 namespace BA_Socket {
-    inline bool write_to_stdout(const std::string& buffer) {
-        printf("[Client]: Received (%d bytes): %.*s", buffer.size(), buffer.size(), buffer.c_str());
-        return true;
-    }
-
-    int TCP_client__poll__ST_helper(
+    int TCP__Client__Low__ST_helper(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
@@ -51,33 +47,33 @@ namespace BA_Socket {
         PRINTF1("[Client]: To send data, enter text followed by enter.\n");
 
         // create the event looop
-        Event_Loop__Poll__ST el{ 100 };
-        el.fd_register(0, Enum_Event_Types::Read);
-        el.add_handler(
+        Event_Loop__Low__ST el{ 0, 100000 };
+        el.fd_register(0, Enum_IO_Event_Types::Read);
+        el.add_event_handler(
             0,
             std::make_unique<Handler_Read_Redirect>(std::vector<int>{ fd_peer }),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
 
-        el.fd_register(fd_peer, Enum_Event_Types::Read);
-        el.add_handler(
+        el.fd_register(fd_peer, Enum_IO_Event_Types::Read);
+        el.add_event_handler(
             fd_peer,
             std::make_unique<Handler_Read_Forward<string_forward_t>>(&write_to_stdout),
-            Enum_Event_Types::Read);
+            Enum_IO_Event_Types::Read);
         el.run();
 
         return 0;
     }
-    
-    inline int TCP_client__poll__ST(
+
+    inline int TCP__Client__Low__ST(
         const std::string& hostname = "localhost",
         uint16_t port = 8080,
         int family = AF_INET6)
     {
         SOCKET_STARTUP();
-        int status = TCP_client__poll__ST_helper(hostname, port, family);
+        int status = TCP__Client__Low__ST_helper(hostname, port, family);
         SOCKET_CLEANUP();
         return status;
     }
 } // namespace BA_Socket
 
-#endif // TCP_CLIENT__POLL__ST_HPP
+#endif // TCP__CLIENT__LOW__ST_HPP
