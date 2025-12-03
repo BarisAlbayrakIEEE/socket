@@ -16,13 +16,13 @@ using namespace BA_Concurrency;
     reactor_event_pack_t rep{};                                \
     rep.emplace_back();                                        \
     return rep
-#define HANDLER_RETURN_PACK__UNREGISTER(fd__)                  \
+#define HANDLER_RETURN_PACK__UNREGISTER(fd__, IO_event_type)   \
     reactor_event_pack_t rep{};                                \
     rep.emplace_back(                                          \
         (fd__),                                                \
         Enum_Register_Types::Unregister,                       \
-        Enum_IO_Event_Types::Read_Write,                       \
-        Enum_Event_Handler_Action_Types::Remove,                    \
+        (IO_event_type),                                       \
+        Enum_Event_Handler_Action_Types::Remove,               \
         nullptr);                                              \
     return rep
 
@@ -52,8 +52,16 @@ namespace BA_Socket {
 
     struct Job {
         int _fd{-1};
-        IEvent_Handler* _event_handler{};
-        Job(int fd, IEvent_Handler *event_handler) : _fd(fd), _event_handler(event_handler) {};
+        Event_Handler_Entry *_event_handler_entry{};
+        Enum_IO_Event_Types _IO_event_type{Enum_IO_Event_Types::Read};
+        Job(
+            int fd,
+            Event_Handler_Entry *event_handler_entry,
+            Enum_IO_Event_Types IO_event_type)
+                :
+                _fd(fd),
+                _event_handler_entry(event_handler_entry),
+                _IO_event_type(IO_event_type) {};
     };
     using job_result_t = Reactor_Event;
     using job_result_pack_t = std::vector<job_result_t>;
@@ -83,35 +91,39 @@ namespace BA_Socket {
         const Job& job,
         Concurrent_Queue_Type__job_result& job_results)
     {
-        auto rep = std::move(job._event_handler->apply(job._fd));
-        for (auto& rc : rep) {
-            job_results.push(std::move(rc));
+        reactor_event_pack_t rep;
+        if (job._IO_event_type == Enum_IO_Event_Types::Read) {
+            rep = std::move(job._event_handler_entry->_event_handler__read->apply(job._fd));
+        } else {
+            rep = std::move(job._event_handler_entry->_event_handler__write->apply(job._fd));
+        }
+        for (auto& re : rep) {
+            if (re._register_type == Enum_Register_Types::Unregister) {
+                job._event_handler_entry->_active = false;
+            }
+            job_results.push(std::move(re));
         }
     };
 
     // forward declerations for the handlers
-    struct Handler_Write;
-    struct Handler_Redirect;
+    struct Event_Handler_Write;
+    struct Event_Handler_Redirect;
     template <typename F>
         requires CString_Forward<F>
-    struct Handler_Read_Forward;
-    struct Handler_Read_Redirect;
-    template <typename F, typename Next_Handler_Type>
-        requires
-            CString_Transform<F> &&
-            (
-                std::is_same_v<Next_Handler_Type, Handler_Write> ||
-                std::is_same_v<Next_Handler_Type, Handler_Redirect>)
-    struct Handler_Read_Transform;
+    struct Event_Handler_Read_Forward;
+    struct Event_Handler_Read_Redirect;
+    template <typename F, typename Next_Event_Handler_Type>
+        requires CString_Transform<F>
+    struct Event_Handler_Read_Transform;
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform_Write;
+    struct Event_Handler_Read_Transform_Write;
     template <typename F>
         requires CString_Transform<F>
-    struct Handler_Read_Transform_Redirect;
-    template <typename Next_Handler_Type>
-        requires std::is_base_of_v<IEvent_Handler, Next_Handler_Type>
-    struct Handler_Accept;
+    struct Event_Handler_Read_Transform_Redirect;
+    template <typename Next_Event_Handler_Type>
+        requires std::is_base_of_v<IEvent_Handler, Next_Event_Handler_Type>
+    struct Event_Handler_Accept;
 } // namespace BA_Socket
 
 #endif // IEVENT_HANDLER_HPP

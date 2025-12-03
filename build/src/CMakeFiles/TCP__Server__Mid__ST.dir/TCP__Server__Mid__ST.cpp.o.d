@@ -1,7 +1,7 @@
 src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.o: \
  /home/administrator/Documents/Work/Kod/cpp/socket/src/TCP__Server__Mid__ST.cpp \
  /usr/include/stdc-predef.h \
- /home/administrator/Documents/Work/Kod/cpp/socket/inc/TCP__Server__Mid__ST.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/TCP__Server.hpp \
  /home/administrator/Documents/Work/Kod/cpp/socket/inc/Socket.hpp \
  /usr/include/c++/12/stdexcept /usr/include/c++/12/exception \
  /usr/include/x86_64-linux-gnu/c++/12/bits/c++config.h \
@@ -158,7 +158,10 @@ src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.o: \
  /usr/include/linux/close_range.h /usr/include/ifaddrs.h \
  /usr/include/c++/12/stdlib.h /usr/include/c++/12/cstring \
  /usr/include/string.h /usr/include/strings.h \
- /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Mid__ST.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Factory.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Low__ST.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Low__Base.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Base.hpp \
  /usr/include/c++/12/unordered_map \
  /usr/include/c++/12/ext/aligned_buffer.h \
  /usr/include/c++/12/bits/hashtable.h \
@@ -167,11 +170,7 @@ src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.o: \
  /usr/include/c++/12/bits/enable_special_members.h \
  /usr/include/c++/12/bits/node_handle.h \
  /usr/include/c++/12/bits/unordered_map.h \
- /usr/include/c++/12/bits/erase_if.h /usr/include/c++/12/vector \
- /usr/include/c++/12/bits/stl_uninitialized.h \
- /usr/include/c++/12/bits/stl_vector.h \
- /usr/include/c++/12/bits/stl_bvector.h \
- /usr/include/c++/12/bits/vector.tcc /usr/include/c++/12/atomic \
+ /usr/include/c++/12/bits/erase_if.h /usr/include/c++/12/atomic \
  /usr/include/c++/12/bits/atomic_base.h \
  /usr/include/c++/12/bits/atomic_lockfree_defines.h \
  /usr/include/c++/12/bits/atomic_wait.h \
@@ -203,24 +202,10 @@ src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/syscall.h \
  /usr/include/c++/12/bits/std_mutex.h /usr/include/c++/12/system_error \
  /usr/include/x86_64-linux-gnu/c++/12/bits/error_constants.h \
- /home/administrator/Documents/Work/Kod/cpp/socket/inc/poll_setup.hpp \
- /usr/include/poll.h /usr/include/x86_64-linux-gnu/sys/poll.h \
- /usr/include/x86_64-linux-gnu/bits/poll.h \
  /home/administrator/Documents/Work/Kod/cpp/socket/inc/IEvent_Loop.hpp \
  /home/administrator/Documents/Work/Kod/cpp/socket/inc/core.hpp \
- /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Handler.hpp \
- /usr/include/c++/12/functional /usr/include/c++/12/bits/std_function.h \
- /usr/include/c++/12/array /usr/include/c++/12/bits/stl_algo.h \
- /usr/include/c++/12/bits/algorithmfwd.h \
- /usr/include/c++/12/bits/stl_heap.h \
+ /usr/include/c++/12/memory /usr/include/c++/12/bits/stl_uninitialized.h \
  /usr/include/c++/12/bits/stl_tempbuf.h \
- /usr/include/c++/12/bits/uniform_int_dist.h \
- /home/administrator/Documents/Work/Kod/cpp/socket/inc/IEvent_Handler.hpp \
- /home/administrator/Documents/Work/Kod/cpp/socket/../lock_free/IConcurrent_Queue.hpp \
- /usr/include/c++/12/optional \
- /home/administrator/Documents/Work/Kod/cpp/socket/../lock_free/IThread_Pool.hpp \
- /home/administrator/Documents/Work/Kod/cpp/socket/inc/Reactor_Event.hpp \
- /usr/include/c++/12/memory \
  /usr/include/c++/12/bits/stl_raw_storage_iter.h \
  /usr/include/c++/12/bits/align.h /usr/include/c++/12/bit \
  /usr/include/c++/12/bits/unique_ptr.h /usr/include/c++/12/ostream \
@@ -251,6 +236,37 @@ src/CMakeFiles/TCP__Server__Mid__ST.dir/TCP__Server__Mid__ST.cpp.o: \
  /usr/include/c++/12/bits/uses_allocator_args.h \
  /usr/include/c++/12/pstl/glue_memory_defs.h \
  /usr/include/c++/12/pstl/execution_defs.h \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Handler.hpp \
+ /usr/include/c++/12/functional /usr/include/c++/12/bits/std_function.h \
+ /usr/include/c++/12/vector /usr/include/c++/12/bits/stl_vector.h \
+ /usr/include/c++/12/bits/stl_bvector.h \
+ /usr/include/c++/12/bits/vector.tcc /usr/include/c++/12/array \
+ /usr/include/c++/12/bits/stl_algo.h \
+ /usr/include/c++/12/bits/algorithmfwd.h \
+ /usr/include/c++/12/bits/stl_heap.h \
+ /usr/include/c++/12/bits/uniform_int_dist.h \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/IEvent_Handler.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/../lock_free/IConcurrent_Queue.hpp \
+ /usr/include/c++/12/optional \
+ /home/administrator/Documents/Work/Kod/cpp/socket/../lock_free/IThread_Pool.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Reactor_Event.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Low__HP.hpp \
+ /usr/include/c++/12/thread /usr/include/c++/12/stop_token \
+ /usr/include/c++/12/bits/std_thread.h /usr/include/c++/12/semaphore \
+ /usr/include/c++/12/bits/semaphore_base.h \
+ /usr/include/c++/12/bits/chrono.h /usr/include/c++/12/ratio \
+ /usr/include/c++/12/limits /usr/include/c++/12/ctime \
+ /usr/include/c++/12/bits/parse_numbers.h \
+ /usr/include/c++/12/bits/atomic_timed_wait.h \
+ /usr/include/c++/12/bits/this_thread_sleep.h \
+ /usr/include/x86_64-linux-gnu/sys/time.h /usr/include/semaphore.h \
+ /usr/include/x86_64-linux-gnu/bits/semaphore.h \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Mid__ST.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Mid__Base.hpp \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/poll_setup.hpp \
+ /usr/include/poll.h /usr/include/x86_64-linux-gnu/sys/poll.h \
+ /usr/include/x86_64-linux-gnu/bits/poll.h \
+ /home/administrator/Documents/Work/Kod/cpp/socket/inc/Event_Loop__Mid__HP.hpp \
  /home/administrator/Documents/Work/Kod/cpp/socket/inc/aux_functions.hpp \
  /usr/include/c++/12/algorithm /usr/include/c++/12/bits/ranges_algo.h \
  /usr/include/c++/12/bits/ranges_util.h \

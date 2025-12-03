@@ -1,6 +1,6 @@
 // TCP__Client__Low__HP.cpp
 
-#include "TCP__Client__Low__HP.hpp"
+#include "TCP__Client.hpp"
 #include "Concurrent_Queue__Blocking.hpp"
 #include "Thread_Pool__Blocking.hpp"
 
@@ -13,8 +13,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
+    using EL_t = Event_Loop__Low__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
     std::string hostname = argv[1];
     uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
-    int status = TCP__Client__Low__HP<Concurrent_Queue__Blocking, Thread_Pool__Blocking>(hostname, port, AF_INET6);
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
     return status;
 }

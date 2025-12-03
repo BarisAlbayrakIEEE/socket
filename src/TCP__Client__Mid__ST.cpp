@@ -1,6 +1,7 @@
 // TCP__Client__Mid__ST.cpp
 
-#include "TCP__Client__Mid__ST.hpp"
+#include "TCP__Client.hpp"
+
 using namespace BA_Socket;
 
 int main(int argc, char *argv[]) {
@@ -9,8 +10,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
+    using EL_t = Event_Loop__Mid__ST_t;
     std::string hostname = argv[1];
     uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
-    int status = TCP__Client__Mid__ST(hostname, port, AF_INET6);
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
     return status;
 }

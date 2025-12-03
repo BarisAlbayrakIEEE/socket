@@ -4,6 +4,7 @@
 #define CORE_HPP
 
 #include <string>
+#include <memory>
 
 namespace BA_Socket {
     const std::string INFO_WRONG_DATA = "Wrong data for the request";
@@ -16,6 +17,9 @@ namespace BA_Socket {
         ST,  // single-threaded (no concurrency)
         HP   // HP: handler parallelism
     };
+
+    struct IEvent_Handler;
+    using event_handler_ptr_t = std::unique_ptr<IEvent_Handler>;
 } // namespace BA_Socket
 
 #endif // CORE_HPP
