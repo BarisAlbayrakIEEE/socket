@@ -81,14 +81,14 @@ Adding new handlers (logging, broadcasting, protocol parsers) requires implement
 # 3. Components <a id='sec3'></a>
 - Cross-platform TCP server and client
 - Select-based event loop (Low/ST, Low/HP)
-- Poll-based event loop (Mid/ST and Mid/HP coming)
+- Poll-based event loop (Mid/ST and Mid/HP)
 - Accept, read, write, redirect, transform handlers
 - Full string-forward and string-transform pipelines
 - Safe RAII socket wrapper
 - Reactor pattern with handler-chaining
 - Non-blocking stdin support (where available)
 - Fully working binaries for both Linux and Windows
-- Unified poll/WSAPoll abstraction
+- Unified ``poll``/``WSAPoll`` abstraction
 
 # 4. Build and Run <a id='sec4'></a>
 The code is:
