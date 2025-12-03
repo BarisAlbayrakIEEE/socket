@@ -1,3 +1,44 @@
+# ./CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.22)
+project(BA_Socket LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# directories
+set(_INC_DIR ${PROJECT_SOURCE_DIR}/inc)
+set(_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
+set(_CONCURRENT_INC_DIR ${PROJECT_SOURCE_DIR}/../lock_free)
+set(_GTEST_INC_DIR /usr/src/googletest/googletest)
+set(_GTEST_LIB_DIR /usr/src/googletest/googletest/build/lib)
+set(_BENCKMARK_INC_DIR /usr/src/googlebenchmark/benchmark/include/benchmark)
+set(_BENCKMARK_LIB_DIR /usr/src/googlebenchmark/benchmark/build/lib)
+
+set(_INC_DIR ${_INC_DIR} PARENT_SCOPE)
+set(_SRC_DIR ${_INC_DIR} PARENT_SCOPE)
+set(_CONCURRENT_INC_DIR ${_CONCURRENT_INC_DIR} PARENT_SCOPE)
+set(_GTEST_INC_DIR ${_GTEST_INC_DIR} PARENT_SCOPE)
+set(_GTEST_LIB_DIR ${_GTEST_LIB_DIR} PARENT_SCOPE)
+set(_BENCKMARK_INC_DIR ${_BENCKMARK_INC_DIR} PARENT_SCOPE)
+set(_BENCKMARK_LIB_DIR ${_BENCKMARK_LIB_DIR} PARENT_SCOPE)
+
+# subdirectories
+add_subdirectory(src)
+add_subdirectory(test)
+add_subdirectory(benchmark)
+
+#config
+set(BA_Socket_VERSION_MAJOR 1)
+set(BA_Socket_VERSION_MINOR 0)
+
+configure_file(
+  config/BA_Socket_Config.h.in
+  config/BA_Socket_Config.h
+)
+
+
 // Reactor_Event.hpp
 
 #ifndef REACTOR_EVENT_HPP
@@ -3180,3 +3221,174 @@ namespace BA_Socket {
 #endif // POLL_SETUP_HPP
 
 
+// TCP__Client__Low__HP.cpp
+
+#include "TCP__Client.hpp"
+#include "Concurrent_Queue__Blocking.hpp"
+#include "Thread_Pool__Blocking.hpp"
+
+using namespace BA_Socket;
+using namespace BA_Concurrency;
+
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: TCP__Client__Low__HP hostname port\n");
+        return 1;
+    }
+    
+    using EL_t = Event_Loop__Low__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
+    std::string hostname = argv[1];
+    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
+    return status;
+}
+
+
+// TCP__Client__Mid__ST.cpp
+
+#include "TCP__Client.hpp"
+
+using namespace BA_Socket;
+
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: TCP__Client__Mid__ST hostname port\n");
+        return 1;
+    }
+    
+    using EL_t = Event_Loop__Mid__ST_t;
+    std::string hostname = argv[1];
+    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
+    return status;
+}
+
+
+// TCP__Server__Low__HP.cpp
+
+#include "TCP__Server.hpp"
+#include "Concurrent_Queue__Blocking.hpp"
+#include "Thread_Pool__Blocking.hpp"
+
+using namespace BA_Socket;
+using namespace BA_Concurrency;
+
+int main(int argc, char *argv[]) {
+    using EL_t = Event_Loop__Low__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
+    int status = TCP__Server<EL_t>();
+    return status;
+}
+
+
+// TCP__Server__Mid__HP.cpp
+
+#include "TCP__Server.hpp"
+#include "Concurrent_Queue__Blocking.hpp"
+#include "Thread_Pool__Blocking.hpp"
+
+using namespace BA_Socket;
+using namespace BA_Concurrency;
+
+int main(int argc, char *argv[]) {
+    using EL_t = Event_Loop__Mid__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
+    int status = TCP__Server<EL_t>();
+    return status;
+}
+
+
+// TCP__Client__Low__ST.cpp
+
+#include "TCP__Client.hpp"
+
+using namespace BA_Socket;
+
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: TCP__Client__Low__ST hostname port\n");
+        return 1;
+    }
+    
+    using EL_t = Event_Loop__Low__ST_t;
+    std::string hostname = argv[1];
+    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
+    return status;
+}
+
+
+// TCP__Server__Mid__ST.cpp
+
+#include "TCP__Server.hpp"
+
+using namespace BA_Socket;
+
+int main(int argc, char *argv[]) {
+    using EL_t = Event_Loop__Mid__ST_t;
+    int status = TCP__Server<EL_t>();
+    return status;
+}
+
+
+# ./src/CMakeLists.txt
+
+#file(GLOB SRC_FILES *.cpp)
+
+add_executable(TCP__Server__Low__ST TCP__Server__Low__ST.cpp)
+add_executable(TCP__Server__Low__HP TCP__Server__Low__HP.cpp)
+add_executable(TCP__Server__Mid__ST TCP__Server__Mid__ST.cpp)
+add_executable(TCP__Server__Mid__HP TCP__Server__Mid__HP.cpp)
+add_executable(TCP__Client__Low__ST TCP__Client__Low__ST.cpp)
+add_executable(TCP__Client__Low__HP TCP__Client__Low__HP.cpp)
+add_executable(TCP__Client__Mid__ST TCP__Client__Mid__ST.cpp)
+add_executable(TCP__Client__Mid__HP TCP__Client__Mid__HP.cpp)
+target_include_directories(TCP__Server__Low__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Server__Low__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Server__Mid__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Server__Mid__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Low__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Low__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Mid__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Mid__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+#set_target_properties(
+#  BA_Socket
+#  PROPERTIES
+#  ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
+#  LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
+#)
+#target_compile_options(BA_Socket PRIVATE -Wall -Wextra -Wpedantic)
+
+
+// TCP__Client__Mid__HP.cpp
+
+#include "TCP__Client.hpp"
+#include "Concurrent_Queue__Blocking.hpp"
+#include "Thread_Pool__Blocking.hpp"
+
+using namespace BA_Socket;
+using namespace BA_Concurrency;
+
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: TCP__Client__Mid__HP hostname port\n");
+        return 1;
+    }
+    
+    using EL_t = Event_Loop__Mid__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
+    std::string hostname = argv[1];
+    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
+    return status;
+}
+
+
+// TCP__Server__Low__ST.cpp
+
+#include "TCP__Server.hpp"
+
+using namespace BA_Socket;
+
+int main(int argc, char *argv[]) {
+    using EL_t = Event_Loop__Low__ST_t;
+    int status = TCP__Server<EL_t>();
+    return status;
+}

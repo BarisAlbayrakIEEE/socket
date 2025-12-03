@@ -1,6 +1,6 @@
-// TCP_client__poll__MT.cpp
+// TCP__Client__Low__HP.cpp
 
-#include "TCP_client__poll__MT.hpp"
+#include "TCP__Client.hpp"
 #include "Concurrent_Queue__Blocking.hpp"
 #include "Thread_Pool__Blocking.hpp"
 
@@ -9,20 +9,41 @@ using namespace BA_Concurrency;
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "usage: TCP_client__poll__MT hostname port\n");
+        fprintf(stderr, "usage: TCP__Client__Low__HP hostname port\n");
         return 1;
     }
     
+    using EL_t = Event_Loop__Low__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
     std::string hostname = argv[1];
     uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
-    int status = TCP_client__poll__MT<Concurrent_Queue__Blocking, Thread_Pool__Blocking>(hostname, port, AF_INET6);
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
     return status;
 }
 
 
-// TCP_client__select__MT.cpp
+// TCP__Client__Mid__ST.cpp
 
-#include "TCP_client__select__MT.hpp"
+#include "TCP__Client.hpp"
+
+using namespace BA_Socket;
+
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: TCP__Client__Mid__ST hostname port\n");
+        return 1;
+    }
+    
+    using EL_t = Event_Loop__Mid__ST_t;
+    std::string hostname = argv[1];
+    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
+    return status;
+}
+
+
+// TCP__Server__Low__HP.cpp
+
+#include "TCP__Server.hpp"
 #include "Concurrent_Queue__Blocking.hpp"
 #include "Thread_Pool__Blocking.hpp"
 
@@ -30,69 +51,57 @@ using namespace BA_Socket;
 using namespace BA_Concurrency;
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        fprintf(stderr, "usage: TCP_client__select__MT hostname port\n");
-        return 1;
-    }
-    
-    std::string hostname = argv[1];
-    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
-    int status = TCP_client__select__MT<Concurrent_Queue__Blocking, Thread_Pool__Blocking>(hostname, port, AF_INET6);
+    using EL_t = Event_Loop__Low__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
+    int status = TCP__Server<EL_t>();
     return status;
 }
 
 
-// TCP_server__poll__ST.cpp
+// TCP__Server__Mid__HP.cpp
 
-#include "TCP_server__poll__ST.hpp"
-using namespace BA_Socket;
-
-int main() {
-    int status = TCP_server__poll__ST();
-    return status;
-}
-
-
-// TCP_client__select__ST.cpp
-
-#include "TCP_client__select__ST.hpp"
-using namespace BA_Socket;
-
-int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        fprintf(stderr, "usage: TCP_client__select__ST hostname port\n");
-        return 1;
-    }
-    
-    std::string hostname = argv[1];
-    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
-    int status = TCP_client__select__ST(hostname, port, AF_INET6);
-    return status;
-}
-
-
-// TCP_server__select__MT.cpp
-
-#include "TCP_server__select__MT.hpp"
+#include "TCP__Server.hpp"
 #include "Concurrent_Queue__Blocking.hpp"
 #include "Thread_Pool__Blocking.hpp"
 
 using namespace BA_Socket;
 using namespace BA_Concurrency;
 
-int main() {
-    int status = TCP_server__select__MT<Concurrent_Queue__Blocking, Thread_Pool__Blocking>();
+int main(int argc, char *argv[]) {
+    using EL_t = Event_Loop__Mid__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
+    int status = TCP__Server<EL_t>();
     return status;
 }
 
 
-// TCP_server__select__ST.cpp
+// TCP__Client__Low__ST.cpp
 
-#include "TCP_server__select__ST.hpp"
+#include "TCP__Client.hpp"
+
 using namespace BA_Socket;
 
-int main() {
-    int status = TCP_server__select__ST();
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: TCP__Client__Low__ST hostname port\n");
+        return 1;
+    }
+    
+    using EL_t = Event_Loop__Low__ST_t;
+    std::string hostname = argv[1];
+    uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
+    return status;
+}
+
+
+// TCP__Server__Mid__ST.cpp
+
+#include "TCP__Server.hpp"
+
+using namespace BA_Socket;
+
+int main(int argc, char *argv[]) {
+    using EL_t = Event_Loop__Mid__ST_t;
+    int status = TCP__Server<EL_t>();
     return status;
 }
 
@@ -101,22 +110,22 @@ int main() {
 
 #file(GLOB SRC_FILES *.cpp)
 
-add_executable(TCP_server__select__ST TCP_server__select__ST.cpp)
-add_executable(TCP_server__select__MT TCP_server__select__MT.cpp)
-add_executable(TCP_client__select__ST TCP_client__select__ST.cpp)
-add_executable(TCP_client__select__MT TCP_client__select__MT.cpp)
-add_executable(TCP_server__poll__ST TCP_server__poll__ST.cpp)
-add_executable(TCP_server__poll__MT TCP_server__poll__MT.cpp)
-add_executable(TCP_client__poll__ST TCP_client__poll__ST.cpp)
-add_executable(TCP_client__poll__MT TCP_client__poll__MT.cpp)
-target_include_directories(TCP_server__select__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
-target_include_directories(TCP_server__select__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
-target_include_directories(TCP_client__select__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
-target_include_directories(TCP_client__select__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
-target_include_directories(TCP_server__poll__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
-target_include_directories(TCP_server__poll__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
-target_include_directories(TCP_client__poll__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
-target_include_directories(TCP_client__poll__MT PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+add_executable(TCP__Server__Low__ST TCP__Server__Low__ST.cpp)
+add_executable(TCP__Server__Low__HP TCP__Server__Low__HP.cpp)
+add_executable(TCP__Server__Mid__ST TCP__Server__Mid__ST.cpp)
+add_executable(TCP__Server__Mid__HP TCP__Server__Mid__HP.cpp)
+add_executable(TCP__Client__Low__ST TCP__Client__Low__ST.cpp)
+add_executable(TCP__Client__Low__HP TCP__Client__Low__HP.cpp)
+add_executable(TCP__Client__Mid__ST TCP__Client__Mid__ST.cpp)
+add_executable(TCP__Client__Mid__HP TCP__Client__Mid__HP.cpp)
+target_include_directories(TCP__Server__Low__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Server__Low__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Server__Mid__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Server__Mid__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Low__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Low__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Mid__ST PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
+target_include_directories(TCP__Client__Mid__HP PRIVATE ${_CONCURRENT_INC_DIR} ${_INC_DIR})
 #set_target_properties(
 #  BA_Socket
 #  PROPERTIES
@@ -126,34 +135,39 @@ target_include_directories(TCP_client__poll__MT PRIVATE ${_CONCURRENT_INC_DIR} $
 #target_compile_options(BA_Socket PRIVATE -Wall -Wextra -Wpedantic)
 
 
-// TCP_server__poll__MT.cpp
+// TCP__Client__Mid__HP.cpp
 
-#include "TCP_server__poll__MT.hpp"
+#include "TCP__Client.hpp"
 #include "Concurrent_Queue__Blocking.hpp"
 #include "Thread_Pool__Blocking.hpp"
 
 using namespace BA_Socket;
 using namespace BA_Concurrency;
 
-int main() {
-    int status = TCP_server__poll__MT<Concurrent_Queue__Blocking, Thread_Pool__Blocking>();
-    return status;
-}
-
-
-// TCP_client__poll__ST.cpp
-
-#include "TCP_client__poll__ST.hpp"
-using namespace BA_Socket;
-
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "usage: TCP_client__poll__ST hostname port\n");
+        fprintf(stderr, "usage: TCP__Client__Mid__HP hostname port\n");
         return 1;
     }
     
+    using EL_t = Event_Loop__Mid__HP_t<Concurrent_Queue__Blocking, Thread_Pool__Blocking>;
     std::string hostname = argv[1];
     uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
-    int status = TCP_client__poll__ST(hostname, port, AF_INET6);
+    int status = TCP__Client<EL_t>(hostname, port, AF_INET6);
     return status;
 }
+
+
+// TCP__Server__Low__ST.cpp
+
+#include "TCP__Server.hpp"
+
+using namespace BA_Socket;
+
+int main(int argc, char *argv[]) {
+    using EL_t = Event_Loop__Low__ST_t;
+    int status = TCP__Server<EL_t>();
+    return status;
+}
+
+
